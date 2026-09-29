@@ -1,0 +1,267 @@
+/* ===========================================================
+   高中学习书房 · content.css
+   AI 老师输出的富文本：标题 / 公式 / 表格 / 图 / 时间线 / 思维导图
+   =========================================================== */
+
+.md { font-size: 14.5px; line-height: 1.9; color: var(--ink); }
+.md > *:first-child { margin-top: 0 !important; }
+.md > *:last-child { margin-bottom: 0 !important; }
+
+.md h1, .md h2, .md h3, .md h4 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: .06em;
+  margin: 1.5em 0 .6em;
+  line-height: 1.45;
+}
+.md h1 { font-size: 21px; border-bottom: 1px solid rgba(140, 115, 75, .3); padding-bottom: .3em; }
+.md h2 { font-size: 18.5px; }
+.md h2::before {
+  content: "";
+  display: inline-block;
+  width: 4px; height: 15px;
+  margin-right: 9px;
+  vertical-align: -1px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold-deep));
+}
+.md h3 { font-size: 16.5px; color: #6b421d; }
+.md h4 { font-size: 15px; color: var(--ink-2); }
+
+.md p { margin: .72em 0; }
+.md strong { font-weight: 700; color: #6b421d; }
+.md em { font-style: normal; color: #8a3b2a; border-bottom: 1px dashed rgba(168, 64, 47, .5); }
+
+.md ul, .md ol { margin: .7em 0; padding-left: 1.5em; }
+.md li { margin: .32em 0; }
+.md li::marker { color: var(--gold-deep); }
+.md ul li::marker { content: "◆  "; font-size: .72em; }
+.md ol li::marker { font-family: var(--font-mono); font-size: .9em; }
+
+.md blockquote {
+  margin: 1em 0;
+  padding: 12px 16px 12px 18px;
+  border-left: 3px solid var(--gold);
+  background: linear-gradient(90deg, rgba(246, 233, 196, .55), rgba(246, 233, 196, .12));
+  border-radius: 0 8px 8px 0;
+  color: var(--ink-2);
+}
+.md blockquote p { margin: .35em 0; }
+
+.md hr { border: none; border-top: 1px dashed rgba(140, 115, 75, .45); margin: 1.5em 0; }
+
+.md a { color: #7a4d22; text-decoration: none; border-bottom: 1px solid rgba(150, 96, 44, .5); }
+
+/* 行内代码与代码块 */
+.md code {
+  font-family: var(--font-mono);
+  font-size: .88em;
+  background: rgba(120, 100, 70, .12);
+  border: 1px solid rgba(120, 100, 70, .16);
+  border-radius: 4px;
+  padding: .1em .38em;
+  color: #6b421d;
+}
+.md pre {
+  margin: .9em 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #26201a;
+  border: 1px solid rgba(0, 0, 0, .3);
+  overflow-x: auto;
+}
+.md pre code {
+  background: none; border: none; padding: 0;
+  color: #e8dcc4;
+  font-size: 12.8px;
+  line-height: 1.7;
+}
+.md pre::-webkit-scrollbar { height: 8px; }
+.md pre::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .18); border-radius: 9px; }
+
+/* 表格 */
+.md table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 13.5px;
+  background: rgba(255, 253, 247, .7);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 6px rgba(120, 95, 50, .12);
+}
+.md thead th {
+  background: linear-gradient(180deg, #f2e5c6, #e9d9b2);
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: .06em;
+  color: #5b3818;
+}
+.md th, .md td {
+  border: 1px solid rgba(140, 115, 75, .28);
+  padding: 7px 11px;
+  text-align: left;
+  vertical-align: top;
+}
+.md tbody tr:nth-child(even) { background: rgba(242, 233, 214, .45); }
+.md tbody tr:hover { background: rgba(246, 233, 196, .7); }
+
+/* ---------------------------- 数学公式 ---------------------------- */
+.md .katex { font-size: 1.06em; }
+.md .katex-display {
+  margin: 1em 0;
+  padding: 10px 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.md .katex-display::-webkit-scrollbar { height: 7px; }
+.md .katex-display::-webkit-scrollbar-thumb { background: rgba(120, 100, 70, .28); border-radius: 9px; }
+.md .katex-error { color: var(--danger); font-family: var(--font-mono); font-size: .9em; }
+
+/* 化学式（mhchem 也走 katex，这里补一点视觉） */
+.md .ce { white-space: nowrap; }
+
+/* ---------------------------- 图（plot / svg） ---------------------------- */
+.figure {
+  margin: 1.1em 0;
+  border: 1px solid rgba(140, 115, 75, .32);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fffdf7, #f7f0e0);
+  box-shadow: 0 2px 10px rgba(120, 95, 50, .12);
+  overflow: hidden;
+}
+.figure__cap {
+  padding: 7px 13px;
+  border-bottom: 1px solid rgba(140, 115, 75, .22);
+  font-family: var(--font-serif);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  letter-spacing: .1em;
+  background: rgba(242, 233, 214, .6);
+}
+.figure__body { padding: 10px 12px; overflow-x: auto; }
+.figure__body canvas { display: block; width: 100%; height: auto; }
+.figure__body svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.figure__note {
+  padding: 6px 13px 9px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.7;
+}
+
+/* 画布上的图例 */
+.plot-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 4px 4px 2px; }
+.plot-legend .lg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); font-family: var(--font-mono); }
+.plot-legend .sw { width: 16px; height: 3px; border-radius: 2px; }
+
+/* ---------------------------- 时间线 ---------------------------- */
+.timeline { position: relative; margin: 1.1em 0; padding-left: 26px; }
+.timeline::before {
+  content: "";
+  position: absolute; left: 8px; top: 6px; bottom: 6px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--gold-deep), rgba(201, 162, 39, .25));
+  border-radius: 2px;
+}
+.tl-item { position: relative; margin-bottom: 13px; }
+.tl-item::before {
+  content: "";
+  position: absolute; left: -24px; top: 6px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 2px solid var(--gold-deep);
+  box-shadow: 0 0 0 3px rgba(246, 233, 196, .8);
+}
+.tl-year {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: #7a4d22;
+  font-weight: 600;
+  margin-right: 8px;
+}
+.tl-text { font-size: 13.8px; line-height: 1.75; color: var(--ink); }
+.tl-text .tl-sub { display: block; font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+
+/* ---------------------------- 思维导图 ---------------------------- */
+.mindmap {
+  margin: 1.1em 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow-x: auto;
+  padding: 8px 4px;
+}
+.mm-root {
+  flex: 0 0 auto;
+  padding: 9px 16px;
+  border-radius: 9px;
+  font-family: var(--font-serif);
+  font-size: 14.5px;
+  color: #fdf3dd;
+  background: linear-gradient(150deg, #8a5a2b, #6d4520);
+  box-shadow: 0 3px 10px rgba(90, 55, 20, .3);
+  white-space: nowrap;
+}
+.mm-branches { position: relative; display: flex; flex-direction: column; gap: 7px; padding-left: 30px; }
+.mm-branches::before {
+  content: "";
+  position: absolute; left: 14px; top: 50%;
+  width: 16px; height: 1px;
+  background: rgba(140, 115, 75, .55);
+}
+.mm-branch { position: relative; padding-left: 26px; }
+.mm-branch::before {
+  content: "";
+  position: absolute; left: 0; top: 50%;
+  width: 26px; height: 1px;
+  background: rgba(140, 115, 75, .45);
+}
+.mm-branch::after {
+  content: "";
+  position: absolute; left: -2px; top: 50%;
+  width: 6px; height: 1px;
+  background: rgba(140, 115, 75, .55);
+}
+.mm-node {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fffdf6, #f2e8d2);
+  border: 1px solid rgba(140, 115, 75, .4);
+  box-shadow: 0 1px 5px rgba(120, 95, 50, .12);
+  font-size: 13.5px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.mm-node .lv2 { color: var(--ink-3); font-size: 12.5px; }
+
+/* ---------------------------- 例题 / 检测卡 ---------------------------- */
+.md .ex {
+  margin: 1em 0;
+  border: 1px solid rgba(140, 115, 75, .35);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.md .ex__t {
+  padding: 6px 12px;
+  background: linear-gradient(90deg, rgba(246, 233, 196, .9), rgba(246, 233, 196, .3));
+  font-family: var(--font-serif);
+  font-size: 12.5px;
+  letter-spacing: .16em;
+  color: #7a4d22;
+}
+
+/* 消息里的小按钮（AI 建议的追问） */
+.followups { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; padding-top: 10px; border-top: 1px dashed rgba(140, 115, 75, .35); }
+.followup {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(140, 115, 75, .4);
+  background: rgba(255, 253, 246, .85);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  transition: all .15s ease;
+}
+.followup:hover { background: #fff; border-color: var(--gold-deep); color: var(--ink); transform: translateY(-1px); }
