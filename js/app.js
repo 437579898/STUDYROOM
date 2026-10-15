@@ -12,7 +12,8 @@ import { initBook, showDesk, refreshBook, openToSection } from './book.js';
 import { initStudy, openSection, currentSection } from './study.js';
 import { initWrongbook, collectFromMessage, refreshWrongbook, toggleWrongbook, closeWrongbook } from './wrongbook.js';
 import { initMemo, toggleMemo, closeMemo, refreshMemo } from './memo.js';
-import { initSettings } from './settings.js';
+import { initSettings, applyFxMode } from './settings.js';
+import { initSearch, closeSearch, toggleSearch } from './search.js';
 
 let currentView = 'desk';
 const CODE_KEY = 'study-room.access-code';
@@ -192,6 +193,7 @@ async function boot() {
   initWrongbook();
   initMemo();
   initSettings();
+  applyFxMode();   // 公式强调开关（默认开；关掉时给 body 加 no-fx）
 
   // 再读服务端数据，据此初始化界面（否则会用到默认值）
   await store.init();
@@ -199,6 +201,14 @@ async function boot() {
 
   initBook({
     onPickSection: (id) => enterSection(id),
+  });
+
+  initSearch({
+    onPickSection: (id) => enterSection(id),
+    onOpenDrawer: (which) => {
+      if (which === 'wrongbook') toggleWrongbook(true);
+      else toggleMemo(true);
+    },
   });
 
   initStudy({
@@ -241,8 +251,14 @@ async function boot() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeTop();
+      closeSearch();
       closeWrongbook();
       closeMemo();
+    }
+    // Ctrl/Cmd + F 打开搜索
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+      e.preventDefault();
+      toggleSearchOpen();
     }
     // Ctrl/Cmd + K 切换错题本
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -276,6 +292,9 @@ async function boot() {
 }
 
 function currentSectionId() { return currentSection(); }
+
+/** Ctrl+F 用：打开或用开关切换搜索面板 */
+function toggleSearchOpen() { toggleSearch(); }
 
 boot().catch((e) => {
   console.error(e);

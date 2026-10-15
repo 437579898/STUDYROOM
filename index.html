@@ -11,6 +11,16 @@
 <link rel="stylesheet" href="css/content.css">
 <link rel="stylesheet" href="css/panels.css">
 <link rel="stylesheet" href="css/layout.css">
+
+<!-- 这些库提到 head 并加 defer：一边解析 HTML 一边就开始下载（和 CSS 并行），
+     但仍按顺序在解析完成后执行，所以 subject.js / render.js 读到的一定是就绪的。
+     放在 </body> 前的话，要等整个 body 解析完才开始下载。 -->
+<script defer src="data/curriculum.js"></script>
+<script defer src="data/concepts.js"></script>
+<script defer src="vendor/katex/katex.min.js"></script>
+<script defer src="vendor/katex/contrib/mhchem.min.js"></script>
+<script defer src="vendor/marked.min.js"></script>
+<script defer src="js/app.js" type="module"></script>
 </head>
 <body>
 
@@ -33,6 +43,10 @@
   <button class="corner-btn" id="btn-memo" aria-label="备忘录">
     <span class="shape-diamond"></span>
     <span class="tip">备忘录</span>
+  </button>
+  <button class="corner-btn" id="btn-search" aria-label="搜索章节">
+    <span class="mag-glyph">⌕</span>
+    <span class="tip">搜索章节 / 概念</span>
   </button>
 </div>
 
@@ -262,6 +276,30 @@
       </div>
 
       <div class="field">
+        <label>公式强调</label>
+        <div style="display:flex;gap:8px;">
+          <button class="chip" id="cfg-fx-on">开（推荐）</button>
+          <button class="chip" id="cfg-fx-off">关</button>
+        </div>
+        <span class="hint">
+          先生会用荧光笔标出本节最该记住的<strong>通式及其变形</strong>（题目里代入了数值或专属符号的式子不标）。<br>
+          判断由 AI 做，可能不准。觉得标得不对就一键关掉，页面会恢复成普通公式。
+        </span>
+      </div>
+
+      <div class="field">
+        <label>内容加载</label>
+        <div style="display:flex;gap:8px;">
+          <button class="chip" id="cfg-load-next">仅预加载下一级（推荐）</button>
+          <button class="chip" id="cfg-load-none">不预加载</button>
+        </div>
+        <span class="hint">
+          <b>仅预加载下一级</b>：左侧章节树只构建<strong>当前册</strong>，其他册等你展开才构建。<br>
+          <b>不预加载</b>：只构建<strong>当前章</strong>，看到哪一级才建哪一级（更省，展开时会有轻微构建感）。
+        </span>
+      </div>
+
+      <div class="field">
         <label>版面比例</label>
         <div style="display:flex;gap:8px;">
           <button class="chip" id="cfg-layout-fixed" data-layout="fixed">固定版面（推荐）</button>
@@ -299,6 +337,21 @@
   </div>
 </div>
 
+<!-- ===================== 搜索面板 ===================== -->
+<div class="search-pop" id="search-pop" hidden>
+  <div class="search-pop__head">
+    <span class="mag-glyph sm">⌕</span>
+    <input class="search-pop__input" id="search-input" type="text" autocomplete="off" spellcheck="false"
+      placeholder="搜章节名，或直接搜概念：配方法、洛伦兹力、奇变偶不变…">
+    <button class="search-pop__close" id="search-close" aria-label="关闭">✕</button>
+  </div>
+  <div class="search-pop__body scroll" id="search-results"></div>
+  <div class="search-pop__foot">
+    <span>↑ ↓ 选择　Enter 进入　Esc 关闭</span>
+    <span id="search-count"></span>
+  </div>
+</div>
+
 <!-- ===================== 访问口令锁屏 ===================== -->
 <div class="lock" id="lock" hidden>
   <div class="lock__card">
@@ -315,10 +368,5 @@
 
 </div><!-- /#app -->
 
-<script src="data/curriculum.js"></script>
-<script src="vendor/katex/katex.min.js"></script>
-<script src="vendor/katex/contrib/mhchem.min.js"></script>
-<script src="vendor/marked.min.js"></script>
-<script type="module" src="js/app.js"></script>
 </body>
 </html>

@@ -20,7 +20,7 @@
   align-items: center;
   gap: 12px;
   padding: 0 18px;
-  border-bottom: 1px solid rgba(232, 207, 140, .16);
+  border-bottom: 1px solid rgba(203, 185, 141, .16);
   background: linear-gradient(180deg, rgba(20, 14, 8, .72), rgba(20, 14, 8, .42));
   backdrop-filter: blur(8px);
   z-index: 5;
@@ -31,14 +31,14 @@
   display: grid; place-items: center;
   border-radius: 9px;
   color: var(--gold-light);
-  border: 1px solid rgba(232, 207, 140, .22);
-  background: rgba(255, 236, 198, .06);
+  border: 1px solid rgba(203, 185, 141, .22);
+  background: rgba(226, 213, 184, .06);
   font-size: 15px;
   transition: all .16s ease;
   flex: 0 0 auto;
 }
-.icon-btn:hover { background: rgba(255, 236, 198, .16); border-color: rgba(232, 207, 140, .5); }
-.icon-btn.is-on { background: rgba(232, 207, 140, .24); border-color: var(--gold-light); }
+.icon-btn:hover { background: rgba(226, 213, 184, .16); border-color: rgba(203, 185, 141, .5); }
+.icon-btn.is-on { background: rgba(203, 185, 141, .24); border-color: var(--gold-light); }
 
 .crumbs {
   display: flex; align-items: center; gap: 8px;
@@ -49,7 +49,7 @@
   letter-spacing: .05em;
   overflow: hidden;
 }
-.crumbs .sep { color: rgba(232, 207, 140, .35); }
+.crumbs .sep { color: rgba(203, 185, 141, .35); }
 .crumbs .crumb { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .crumbs .crumb--cur { color: var(--gold-light); font-size: 16px; }
 .crumbs .subj-dot {
@@ -62,8 +62,8 @@
 .progress-pill {
   font-size: 12px;
   color: var(--gold-light);
-  border: 1px solid rgba(232, 207, 140, .28);
-  background: rgba(255, 236, 198, .07);
+  border: 1px solid rgba(203, 185, 141, .28);
+  background: rgba(226, 213, 184, .07);
   padding: 5px 12px;
   border-radius: 999px;
   white-space: nowrap;
@@ -100,7 +100,7 @@
 /* 侧栏（深色玻璃 + 纸感） */
 .pane--left, .pane--right {
   background: linear-gradient(180deg, rgba(28, 20, 12, .78), rgba(18, 12, 7, .82));
-  border: 1px solid rgba(232, 207, 140, .15);
+  border: 1px solid rgba(203, 185, 141, .15);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 14px 34px rgba(0, 0, 0, .36);
 }
 
@@ -108,16 +108,16 @@
   flex: 0 0 auto;
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 12px 14px;
-  border-bottom: 1px solid rgba(232, 207, 140, .14);
+  border-bottom: 1px solid rgba(203, 185, 141, .14);
   font-family: var(--font-serif);
   font-size: 13.5px;
   color: var(--gold-light);
   letter-spacing: .2em;
 }
 .pane__head .n { font-family: var(--font-sans); font-size: 11.5px; color: rgba(232, 220, 192, .5); letter-spacing: 0; }
-.pane__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px; }
+.pane__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px; contain: layout paint; }
 .pane__body::-webkit-scrollbar { width: 8px; }
-.pane__body::-webkit-scrollbar-thumb { background: rgba(232, 207, 140, .18); border-radius: 9px; }
+.pane__body::-webkit-scrollbar-thumb { background: rgba(203, 185, 141, .18); border-radius: 9px; }
 
 /* ---------------------------- 章节抽屉 ---------------------------- */
 .vol-group { margin-bottom: 12px; }
@@ -132,7 +132,7 @@
   border-radius: 6px;
   transition: background .15s ease;
 }
-.vol-group__title:hover { background: rgba(255, 236, 198, .07); }
+.vol-group__title:hover { background: rgba(226, 213, 184, .07); }
 .vol-group__title .caret { font-size: 10px; opacity: .6; transition: transform .2s ease; }
 .vol-group.is-closed .caret { transform: rotate(-90deg); }
 .vol-group.is-closed .vol-group__list { display: none; }
@@ -152,9 +152,26 @@
   letter-spacing: .04em;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* 懒加载模式下：整章还没建 DOM，标题可点，点了才构建 */
+.chap-block__title.is-lazy {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; cursor: pointer;
+  border-radius: 5px;
+  padding-right: 10px;
+  transition: background .15s ease, color .15s ease;
+}
+.chap-block__title.is-lazy:hover { background: rgba(226, 213, 184, .08); color: rgba(255, 244, 221, .9); }
+.chap-block__title.is-lazy .lazy-hint {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(232, 220, 192, .32);
+  letter-spacing: 0;
+}
+.chap-block__title.is-lazy:hover .lazy-hint { color: rgba(203, 185, 141, .7); }
 .sec-link {
   display: grid;
-  grid-template-columns: 40px 1fr 14px;
+  grid-template-columns: 40px 1fr;
   align-items: center;
   gap: 6px;
   width: 100%;
@@ -166,27 +183,51 @@
   transition: all .15s ease;
   border: 1px solid transparent;
 }
-.sec-link:hover { background: rgba(255, 236, 198, .09); color: #fff4dd; }
+.sec-link:hover { background: rgba(226, 213, 184, .09); color: #fff4dd; }
+/* 当前所在的那一节 —— 全站少数几处保留"焦点金"的地方之一。
+   深色面板上亮金对比度 11.9:1，是唯一能把"就是这里"喊出来的东西；
+   其余装饰性金色已全部降级为哑光黄铜。 */
 .sec-link.is-on {
-  background: linear-gradient(90deg, rgba(232, 207, 140, .22), rgba(232, 207, 140, .06));
-  border-color: rgba(232, 207, 140, .34);
-  color: #fff4dd;
+  background: linear-gradient(90deg, rgba(232, 207, 140, .22), rgba(232, 207, 140, .05));
+  border-color: rgba(232, 207, 140, .38);
+  color: #fff8e8;
 }
 .sec-link .no { font-family: var(--font-mono); font-size: 11px; color: rgba(232, 220, 192, .5); }
 .sec-link .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sec-link .mk { font-size: 10px; text-align: center; }
-.sec-link .mk[data-s="done"] { color: #7fc78f; }
-.sec-link .mk[data-s="studying"] { color: #e0b862; }
+/* 章节状态：只改字体颜色，不加图标、不加底色、不加动画。
+   （原来的小圆点已删除：既不美观也不实用。） */
+.sec-link.is-visited .nm { color: var(--state-visited); }
+.sec-link.has-chat  .nm { color: var(--state-conversation); }
+.sec-link.is-visited .no { color: rgba(232, 220, 192, .28); }
+.sec-link.has-chat  .no { color: rgba(232, 220, 192, .34); }
+/* 选中 > 状态：上面两条把颜色加在了 .nm 上，会盖掉 .is-on 继承下来的白字，
+   所以这里必须再声明一次，否则「正在学的那一节」会是紫的。 */
+.sec-link.is-on .nm { color: #fff8e8; }
+.sec-link.is-on .no { color: rgba(232, 220, 192, .5); }
 
 /* ---------------------------- 对话纸面 ---------------------------- */
 .chat-pane {
   position: relative;
+  /* 纸纤维纹理：两道错角的方向叠出来，比单向条纹更像纸。
+     和"渐变"一起承担让同色相有纵深的作用。 */
   background:
     radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, .6), transparent 46%),
+    repeating-linear-gradient(38deg, rgba(140, 118, 82, .045) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(-26deg, rgba(140, 118, 82, .032) 0 1px, transparent 1px 6px),
     repeating-linear-gradient(0deg, rgba(150, 128, 92, .04) 0 1px, transparent 1px 3px),
     linear-gradient(180deg, var(--paper-warm), var(--paper) 30%, var(--paper-deep));
   border: 1px solid var(--paper-edge);
-  box-shadow: var(--shadow-lg), inset 0 0 90px rgba(190, 165, 120, .22);
+  /* 原来这里是 inset 0 0 90px —— 90px 模糊的内阴影每次重绘都很贵。
+     改成 48px 并把暗角挪到不参与滚动的伪元素上，观感几乎一样。 */
+  box-shadow: var(--shadow-lg);
+}
+.chat-pane::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  box-shadow: inset 0 0 48px rgba(190, 165, 120, .20);
 }
 
 .chat-scroll {
@@ -194,7 +235,18 @@
   min-height: 0;
   overflow-y: auto;
   padding: 22px 26px 8px;
-  scroll-behavior: smooth;
+  /* 关键：这里原本是 scroll-behavior: smooth。
+     流式输出时每 90ms 会赋一次 scrollTop，配合 smooth 等于每 90ms 重启一次
+     平滑滚动动画，滚动永远停不下来 —— 卡顿的主因之一。
+     需要平滑的地方（「回到最新」按钮）在 JS 里用 scrollTo({behavior:'smooth'}) 单独指定。 */
+  scroll-behavior: auto;
+  /* 让这个滚动容器独立成层：滚动时不再触发父级那张带渐变+阴影的昂贵背景重绘，
+     这是修「滚动时对话框撕裂」的关键。 */
+  contain: layout paint;
+  will-change: scroll-position;
+  transform: translateZ(0);
+  position: relative;
+  z-index: 1;
 }
 .chat-scroll::-webkit-scrollbar { width: 10px; }
 .chat-scroll::-webkit-scrollbar-thumb { background: rgba(120, 100, 70, .25); border-radius: 99px; border: 3px solid transparent; background-clip: padding-box; }
@@ -293,6 +345,12 @@
   color: #7d2e21;
 }
 
+/* 增量流式渲染的分块容器 */
+.msg__body { display: block; }
+.msg__body > .blk:first-child > *:first-child { margin-top: 0 !important; }
+.msg__body > .blk:last-child > *:last-child { margin-bottom: 0 !important; }
+.msg__body > .blk + .blk { margin-top: 0; }
+
 .msg__bubble.is-streaming::after {
   content: "";
   display: inline-block;
@@ -354,6 +412,97 @@
 /* 流式等待 */
 .msg__waiting { display: flex; align-items: center; gap: 9px; color: var(--ink-3); font-size: 13px; }
 
+/* ---------------------------- 磨砂聚焦 ----------------------------
+   和先生对话时（输入框聚焦、或正在流式输出）把左右面板压下去，注意力落在纸面上。
+   注意：模糊是静态的（只在切换瞬间栅格化一次），过渡只走 opacity，
+   避免在滚动/流式期间产生持续重绘。 */
+body.chat-focus .pane--left,
+body.chat-focus .pane--right {
+  filter: blur(1.8px) saturate(.55) brightness(.8);
+  opacity: .42;
+}
+.pane--left, .pane--right { transition: opacity .28s ease, filter .28s ease; }
+
+/* 对话分页按钮 */
+.load-earlier {
+  display: block;
+  margin: 4px auto 20px;
+  padding: 6px 18px;
+  border-radius: 999px;
+  border: 1px dashed rgba(140, 115, 75, .42);
+  background: rgba(255, 253, 247, .5);
+  font-size: 12px;
+  font-family: var(--font-serif);
+  letter-spacing: .08em;
+  color: var(--ink-3);
+  transition: all .16s ease;
+}
+.load-earlier:hover { background: #fff; border-color: var(--gold-deep); color: var(--ink); }
+
+/* ---------------------------- 开场卡片 ---------------------------- */
+/* 取代了"进章节就自动开讲"。先生不再主动发言，必须点按钮才发第一次请求。 */
+.start-card {
+  max-width: 470px;
+  margin: 26px auto 8px;
+  padding: 30px 34px 26px;
+  text-align: center;
+  border: 1px solid rgba(140, 115, 75, .34);
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(255, 253, 247, .72), rgba(242, 233, 214, .48));
+  box-shadow: 0 4px 18px rgba(120, 95, 50, .10);
+  animation: startIn .4s cubic-bezier(.2, .9, .3, 1) both;
+}
+@keyframes startIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+.start-card__rule {
+  width: 46px; height: 2px;
+  margin: 0 auto 18px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--acc, var(--gold-deep)), transparent);
+}
+.start-card__kicker {
+  font-family: var(--font-serif);
+  font-size: 12px;
+  letter-spacing: .24em;
+  text-indent: .24em;
+  color: var(--ink-3);
+  margin-bottom: 10px;
+}
+.start-card__title {
+  font-family: var(--font-serif);
+  font-size: 23px;
+  letter-spacing: .08em;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.start-card__meta {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  letter-spacing: .06em;
+  margin-bottom: 6px;
+}
+.start-card__sib {
+  font-size: 11.5px;
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+  letter-spacing: .02em;
+  margin-bottom: 18px;
+}
+.start-card__btn {
+  margin-top: 6px;
+  padding: 11px 34px;
+  font-size: 14px;
+  letter-spacing: .28em;
+  text-indent: .28em;
+  justify-content: center;
+}
+.start-card__hint {
+  margin-top: 14px;
+  font-size: 11.5px;
+  color: var(--ink-4);
+  line-height: 1.8;
+}
+
 /* ---------------------------- 输入区 ---------------------------- */
 .composer {
   flex: 0 0 auto;
@@ -381,7 +530,7 @@
 }
 .composer__box:focus-within {
   border-color: var(--gold-deep);
-  box-shadow: inset 0 1px 4px rgba(120, 100, 70, .08), 0 0 0 3px rgba(201, 162, 39, .16);
+  box-shadow: inset 0 1px 4px rgba(120, 100, 70, .08), 0 0 0 3px rgba(168, 148, 100, .16);
 }
 .composer__input {
   flex: 1 1 auto;
@@ -446,18 +595,18 @@
   line-height: 1.6;
   transition: background .15s ease;
 }
-.outline-item:hover { background: rgba(255, 236, 198, .08); }
+.outline-item:hover { background: rgba(226, 213, 184, .08); }
 .outline-item .dot {
   width: 6px; height: 6px; border-radius: 50%;
-  background: rgba(232, 207, 140, .5);
+  background: rgba(203, 185, 141, .5);
   margin-top: 8px;
 }
-.outline-item.is-cur { background: rgba(232, 207, 140, .14); color: #fff4dd; }
-.outline-item.is-cur .dot { background: var(--gold-light); box-shadow: 0 0 8px rgba(232, 207, 140, .7); }
+.outline-item.is-cur { background: rgba(203, 185, 141, .14); color: #fff4dd; }
+.outline-item.is-cur .dot { background: var(--gold-light); box-shadow: 0 0 7px rgba(232, 207, 140, .55); }
 
 .side-card {
-  border: 1px solid rgba(232, 207, 140, .16);
-  background: rgba(255, 236, 198, .05);
+  border: 1px solid rgba(203, 185, 141, .16);
+  background: rgba(226, 213, 184, .05);
   border-radius: 9px;
   padding: 11px 12px;
   margin-bottom: 11px;
@@ -478,7 +627,7 @@
 
 .bar {
   height: 6px; border-radius: 99px;
-  background: rgba(255, 236, 198, .14);
+  background: rgba(226, 213, 184, .14);
   overflow: hidden;
   margin: 6px 0 2px;
 }
@@ -500,7 +649,7 @@
   width: 100%;
   transition: background .14s ease;
 }
-.mini-item:hover { background: rgba(255, 236, 198, .09); color: #fff4dd; }
+.mini-item:hover { background: rgba(226, 213, 184, .09); color: #fff4dd; }
 .mini-item .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-item .st { font-size: 10.5px; color: rgba(232, 220, 192, .45); }
 
@@ -512,12 +661,12 @@
   border-radius: 7px;
   font-size: 12.5px;
   color: rgba(240, 230, 210, .85);
-  border: 1px solid rgba(232, 207, 140, .16);
-  background: rgba(255, 236, 198, .04);
+  border: 1px solid rgba(203, 185, 141, .16);
+  background: rgba(226, 213, 184, .04);
   transition: all .15s ease;
   line-height: 1.5;
 }
-.ask-btn:hover { background: rgba(255, 236, 198, .13); border-color: rgba(232, 207, 140, .4); color: #fff4dd; }
+.ask-btn:hover { background: rgba(226, 213, 184, .13); border-color: rgba(203, 185, 141, .4); color: #fff4dd; }
 
 /* 只有在"自适应模式"下才收起侧栏；固定画布模式下版面恒定 */
 body.fluid .study-main { grid-template-columns: 240px minmax(0,1fr) 0; }

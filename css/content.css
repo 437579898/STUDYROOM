@@ -119,6 +119,32 @@
 .md .katex-display::-webkit-scrollbar-thumb { background: rgba(120, 100, 70, .28); border-radius: 9px; }
 .md .katex-error { color: var(--danger); font-family: var(--font-mono); font-size: .9em; }
 
+/* ---------------------------- 关键公式强调（荧光笔） ----------------------------
+   样式取自"素笺干玫瑰"那套的 B 方案：单道斜涂，两头靠内边距轻微外溢，像笔尖收尾。
+   底色透明度压在 30%：实测超过 34% 就退化成色块，正是要避免的。
+   纯平色、不发光、不闪烁。 */
+.md mark.fx {
+  background-color: transparent;
+  color: var(--accent, #8a4f59);
+  padding: .02em .17em;
+  /* 长公式折行时分两段独立高亮，而不是拉成歪掉的一整块 */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  background-image: linear-gradient(177.5deg,
+    transparent 5%,
+    rgba(176, 116, 127, .34) 11%,
+    rgba(176, 116, 127, .30) 60%,
+    rgba(176, 116, 127, .36) 88%,
+    transparent 95%);
+}
+
+/* 兜底开关：设置里关掉「公式强调」时整站不再涂抹，连 == 的痕迹也不留 */
+body.no-fx .md mark.fx {
+  background-image: none;
+  color: inherit;
+  padding: 0;
+}
+
 /* 化学式（mhchem 也走 katex，这里补一点视觉） */
 .md .ce { white-space: nowrap; }
 
@@ -161,7 +187,7 @@
   content: "";
   position: absolute; left: 8px; top: 6px; bottom: 6px;
   width: 2px;
-  background: linear-gradient(180deg, var(--gold-deep), rgba(201, 162, 39, .25));
+  background: linear-gradient(180deg, var(--gold-deep), rgba(168, 148, 100, .25));
   border-radius: 2px;
 }
 .tl-item { position: relative; margin-bottom: 13px; }

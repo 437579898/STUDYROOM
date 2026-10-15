@@ -8,8 +8,22 @@ import { openModal, closeModal } from './overlay.js';
 import { store } from './store.js';
 import { applyStage, layoutMode } from './stage.js';
 import { isStandalone, modeLabel } from './runtime.js';
+import { refreshTree } from './study.js';
 
 const CODE_KEY = 'study-room.access-code';
+
+/** 内容加载模式：'next' 只预加载下一级（默认） / 'none' 不预加载 */
+function loadMode() {
+  return (store.state.prefs && store.state.prefs.loadMode) || 'next';
+}
+
+/** 公式强调开关：默认开。关掉时给 body 加 no-fx，CSS 层直接不涂抹。 */
+function fxMode() {
+  return store.state.prefs.formulaHighlight !== false;
+}
+export function applyFxMode() {
+  document.body.classList.toggle('no-fx', !fxMode());
+}
 const CONFIG_KEY = 'study-room.config';
 
 let dom = {};
@@ -63,6 +77,14 @@ function paint(config, notice) {
   dom.layoutFixed.classList.toggle('is-on', mode === 'fixed');
   dom.layoutFluid.classList.toggle('is-on', mode === 'fluid');
 
+  const lm = loadMode();
+  dom.loadNext.classList.toggle('is-on', lm === 'next');
+  dom.loadNone.classList.toggle('is-on', lm === 'none');
+
+  const fx = fxMode();
+  dom.fxOn.classList.toggle('is-on', fx);
+  dom.fxOff.classList.toggle('is-on', !fx);
+
   if (solo) refreshStorageInfo();
 
   if (notice) showNote(notice, 'ok');
@@ -113,6 +135,10 @@ export function initSettings() {
     clearCode: $('#cfg-clearcode'),
     layoutFixed: $('#cfg-layout-fixed'),
     layoutFluid: $('#cfg-layout-fluid'),
+    loadNext: $('#cfg-load-next'),
+    loadNone: $('#cfg-load-none'),
+    fxOn: $('#cfg-fx-on'),
+    fxOff: $('#cfg-fx-off'),
     groupCode: $('#cfg-group-code'),
     groupLocal: $('#cfg-group-local'),
     localUsage: $('#cfg-local-usage'),
@@ -138,6 +164,28 @@ export function initSettings() {
   };
   dom.layoutFixed.addEventListener('click', () => pickLayout('fixed'));
   dom.layoutFluid.addEventListener('click', () => pickLayout('fluid'));
+
+  /* ---- 内容加载模式 ---- */
+  const pickLoad = (m) => {
+    store.setPref('loadMode', m);
+    dom.loadNext.classList.toggle('is-on', m === 'next');
+    dom.loadNone.classList.toggle('is-on', m === 'none');
+    try { refreshTree(); } catch { /* 还没进学习界面时忽略 */ }
+    toast(m === 'next' ? '已切换为「仅预加载下一级」' : '已切换为「不预加载」', 'ok');
+  };
+  dom.loadNext.addEventListener('click', () => pickLoad('next'));
+  dom.loadNone.addEventListener('click', () => pickLoad('none'));
+
+  /* ---- 公式强调开关 ---- */
+  const pickFx = (on) => {
+    store.setPref('formulaHighlight', on);
+    dom.fxOn.classList.toggle('is-on', on);
+    dom.fxOff.classList.toggle('is-on', !on);
+    applyFxMode();
+    toast(on ? '已开启公式强调' : '已关闭公式强调', 'ok');
+  };
+  dom.fxOn.addEventListener('click', () => pickFx(true));
+  dom.fxOff.addEventListener('click', () => pickFx(false));
 
   /* ---- 取消访问口令（仅服务端模式）---- */
   dom.clearCode.addEventListener('click', async (e) => {

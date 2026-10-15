@@ -3,7 +3,7 @@
    =========================================================== */
 import { $, $$, el, toast, fmtTime, scrollToBottom, copyText, debounce } from './util.js';
 import { store } from './store.js';
-import { renderInto, plainText, extractFollowups } from './render.js';
+import { renderInto, plainText, extractFollowups, splitBlocks } from './render.js';
 import { askTeacher, openingInstruction } from './teacher.js';
 import {
   getSubject, getSectionWrap, getVolumeWrap, subjectColor,
@@ -26,7 +26,20 @@ const state = {
   streaming: false,
   abort: null,
   autoScroll: true,
+  opening: false,          // 开场请求进行中，防止重复点
+  msgLimit: 30,            // 当前渲染最近多少条对话
 };
+
+/* 本次会话里打开过的章节（只存在内存里，刷新页面即清空）。
+   用来做左侧章节树的"灰色字体"状态。 */
+const visitedThisSession = new Set();
+
+/* 对话分页：一次只渲染最近这么多条 */
+const MSG_PAGE = 30;
+
+/* 由 initStudy 注入，用于在对话/流式输出期间开启「磨砂聚焦」 */
+let studySetFocusMode = () => {};
+const markVisited = (id) => { if (id) visitedThisSession.add(id); };
 
 let dom = {};
 let onEnterSection = () => {};
@@ -59,49 +72,124 @@ function renderProgressPill() {
   dom.progressPill.innerHTML = '本章 <b>' + cs.done + '/' + cs.total + '</b>　本科 <b>' + ss.done + '/' + ss.total + '</b>';
 }
 
+/**
+ * 该节是否"生成过会话" —— 紫色状态的判定依据。
+ * 用「至少一条非错误、非 pending 的 assistant 消息」，
+ * 这样请求失败、或还在生成中的都不算，避免误判成"学过"。
+ * 注意不要用 store.chatOf()，它会顺手创建空记录。
+ */
+function hasConversation(sectionId) {
+  const chats = store.state.chats || {};
+  const c = chats[sectionId];
+  if (!c || !Array.isArray(c.messages)) return false;
+  return c.messages.some((m) => m.role === 'assistant' && !m.error && !m.pending);
+}
+
 /* ============================ 左栏 ============================ */
+
+/** 加载模式：'next' = 只预加载下一级（默认）；'none' = 看到哪一级加载哪一级 */
+function loadMode() {
+  return (store.state.prefs && store.state.prefs.loadMode) || 'next';
+}
+
+/** 一个小节的按钮。状态优先级：当前选中 > 灰(本次打开) > 紫(有会话) > 正常 */
+function secButton(sec) {
+  const isOn = sec.id === state.sectionId;
+  let cls = 'sec-link';
+  if (isOn) cls += ' is-on';
+  else if (visitedThisSession.has(sec.id)) cls += ' is-visited';
+  else if (hasConversation(sec.id)) cls += ' has-chat';
+
+  return el('button', { class: cls, onclick: () => onEnterSection(sec.id) }, [
+    el('span', { class: 'no', text: sec.no }),
+    el('span', { class: 'nm', text: sec.name }),
+  ]);
+}
+
+/**
+ * 左栏章节树 —— 按需构建。
+ *
+ * 原来这里会把该科的**全部册/章/节**一次性建好（物理 6 册 27 章 125 节 → 591 个元素），
+ * 折叠只是 CSS 隐藏，DOM 一直存在。现在改成：
+ *   next 模式：只建当前册；其他册点开时才建
+ *   none 模式：只建当前章；同册其他章点标题才建
+ * 折叠状态与"已展开的章"都记在内存里，切章节时不丢。
+ */
 function renderLeft() {
   const w = getSectionWrap(state.sectionId);
   const box = dom.leftBody;
+  if (!box) return;
   box.innerHTML = '';
   if (!w) return;
-  const subject = w.subject;
 
+  const subject = w.subject;
+  const mode = loadMode();
   const collapsed = state.collapsedVolumes || (state.collapsedVolumes = {});
+  const expandedChaps = state.expandedChaps || (state.expandedChaps = {});
+
   for (const vol of subject.volumes) {
+    const isCurVol = vol.id === w.volume.id;
+    // 默认：当前册展开，其他册收起
+    if (collapsed[vol.id] === undefined) collapsed[vol.id] = !isCurVol;
+
     const group = el('div', { class: 'vol-group' + (collapsed[vol.id] ? ' is-closed' : '') });
-    const head = el('div', { class: 'vol-group__title', onclick: () => { collapsed[vol.id] = !collapsed[vol.id]; group.classList.toggle('is-closed'); } }, [
+    const list = el('div', { class: 'vol-group__list' });
+    let painted = false;
+
+    const paint = () => {
+      list.innerHTML = '';
+      for (const chap of vol.chapters) {
+        const isCurChap = chap.id === w.chapter.id;
+        const block = el('div', { class: 'chap-block' });
+        const title = el('div', { class: 'chap-block__title', text: chap.no + ' ' + chap.name });
+
+        const shouldBuild = (mode === 'next') || isCurChap || !!expandedChaps[chap.id];
+
+        if (shouldBuild) {
+          block.append(title);
+          for (const sec of chap.sections) block.append(secButton(sec));
+        } else {
+          title.classList.add('is-lazy');
+          title.append(el('span', { class: 'lazy-hint', text: chap.sections.length + ' 节' }));
+          title.addEventListener('click', () => { expandedChaps[chap.id] = true; paint(); });
+          block.append(title);
+        }
+        list.append(block);
+      }
+    };
+
+    const ensurePainted = () => { if (!painted) { painted = true; paint(); } };
+
+    const head = el('div', {
+      class: 'vol-group__title',
+      onclick: () => {
+        collapsed[vol.id] = !collapsed[vol.id];
+        group.classList.toggle('is-closed', collapsed[vol.id]);
+        if (!collapsed[vol.id]) ensurePainted();
+      },
+    }, [
       el('span', { class: 'caret', text: '▾' }),
       el('span', { text: vol.name }),
       el('span', { class: 'badge2', text: vol.chapters.length + ' 章' }),
     ]);
-    group.append(head);
 
-    const list = el('div', { class: 'vol-group__list' });
-    for (const chap of vol.chapters) {
-      const block = el('div', { class: 'chap-block' });
-      block.append(el('div', { class: 'chap-block__title', text: chap.no + ' ' + chap.name }));
-      for (const sec of chap.sections) {
-        const p = store.progressOf(sec.id);
-        const mark = p.status === 'done' ? '✓' : (p.status === 'studying' ? '·' : '');
-        block.append(el('button', {
-          class: 'sec-link' + (sec.id === state.sectionId ? ' is-on' : ''),
-          onclick: () => onEnterSection(sec.id),
-        }, [
-          el('span', { class: 'no', text: sec.no }),
-          el('span', { class: 'nm', text: sec.name }),
-          el('span', { class: 'mk', text: mark, dataset: { s: p.status } }),
-        ]));
-      }
-      list.append(block);
-    }
-    group.append(list);
+    group.append(head, list);
     box.append(group);
+
+    if (!collapsed[vol.id]) ensurePainted();
   }
 
-  // 把当前节滚到视野内
   const cur = box.querySelector('.sec-link.is-on');
   if (cur) setTimeout(() => cur.scrollIntoView({ block: 'center' }), 60);
+}
+
+/**
+ * 重建左栏章节树。设置面板切换「载入模式」后要立刻看到效果 ——
+ * renderLeft 每次都现读 loadMode()，所以直接重画就行。
+ * 还没进学习界面（dom.leftBody 不存在）时静默返回。
+ */
+export function refreshTree() {
+  try { renderLeft(); } catch { /* 未初始化 */ }
 }
 
 /* ============================ 右栏 ============================ */
@@ -197,7 +285,9 @@ function messageNode(msg) {
   const isUser = msg.role === 'user';
   if (msg.hidden) return null;
 
-  const bubble = el('div', { class: 'msg__bubble' });
+  // 必须带 md 类：content.css 里 39 条 Markdown 规则全挂在 .md 下，
+  // 漏了它的话标题、表格、引用、代码块、公式间距在对话里全都不会生效。
+  const bubble = el('div', { class: 'msg__bubble md' });
   if (msg.pending) {
     bubble.append(el('div', { class: 'msg__waiting' }, [el('span', { class: 'spinner' }), el('span', { text: '先生正在斟酌…' })]));
   } else if (msg.error) {
@@ -260,6 +350,44 @@ function messageNode(msg) {
   ]);
 }
 
+/**
+ * 开场卡片 —— 代替原来的"进章节就自动开口"。
+ * 先生不再主动发言，只有点了这个按钮才发第一次请求。
+ * （这同时消除了全站唯一的隐式 token 消耗。）
+ */
+function startCard() {
+  const w = getSectionWrap(state.sectionId);
+  const sibs = w ? w.chapter.sections : [];
+  const idx = w ? sibs.findIndex((s) => s.id === state.sectionId) : -1;
+
+  const card = el('div', { class: 'start-card' });
+  card.append(el('div', { class: 'start-card__rule' }));
+  card.append(el('div', { class: 'start-card__kicker', text: w ? (w.subject.name + ' · ' + w.volume.name + ' · ' + w.chapter.no) : '' }));
+  card.append(el('div', { class: 'start-card__title', text: w ? w.section.no + '　' + w.section.name : '本节' }));
+  card.append(el('div', { class: 'start-card__meta', text: w ? ('本章第 ' + (idx + 1) + ' / ' + sibs.length + ' 节') : '' }));
+
+  if (w) {
+    const others = sibs.filter((x) => x.id !== state.sectionId).map((x) => x.no);
+    if (others.length) card.append(el('div', { class: 'start-card__sib', text: '本章还有：' + others.join('　') }));
+  }
+
+  const btn = el('button', { class: 'btn btn--primary start-card__btn', text: '开 始 本 节 课' });
+  btn.addEventListener('click', async () => {
+    if (state.opening) return;
+    state.opening = true;
+    btn.disabled = true;
+    btn.textContent = '先生正在备课…';
+    try {
+      await ensureOpening();
+    } finally {
+      state.opening = false;
+    }
+  });
+  card.append(btn);
+  card.append(el('div', { class: 'start-card__hint', text: '先生不会自动开口。也可以直接在下面提问。' }));
+  return card;
+}
+
 function renderChat() {
   const box = dom.messages;
   if (!box) return;
@@ -271,12 +399,29 @@ function renderChat() {
   const chat = store.chatOf(state.sectionId);
   const visible = chat.messages.filter((m) => !m.hidden);
   if (!visible.length && !state.streaming) {
-    box.append(el('div', { class: 'empty' }, [el('span', { class: 'big', text: '卷' }), el('div', { text: '先生正在翻开课本…' })]));
+    box.append(startCard());
   }
-  for (const m of chat.messages) {
-    const n = messageNode(m);
-    if (n) box.append(n);
+
+  // 分页：只渲染最近 msgLimit 条。
+  // 原来是把该节全部历史一次建完，一节聊 50 条、每条带公式，
+  // 按实测 78ms/条算就是约 4 秒的卡死 —— 聊得越久越慢。
+  const from = Math.max(0, visible.length - state.msgLimit);
+  if (from > 0) {
+    box.append(el('button', {
+      class: 'load-earlier',
+      onclick: (e) => {
+        state.msgLimit += MSG_PAGE;
+        const keep = dom.scroll.scrollHeight - dom.scroll.scrollTop;
+        renderChat();
+        // 尽量让视野停在原处，不要把用户甩到底部
+        requestAnimationFrame(() => { dom.scroll.scrollTop = dom.scroll.scrollHeight - keep; });
+        e.currentTarget.blur();
+      },
+      text: '▲ 载入更早的 ' + Math.min(from, MSG_PAGE) + ' 条（该节共 ' + visible.length + ' 条）',
+    }));
   }
+  for (let i = from; i < visible.length; i++) box.append(messageNode(visible[i]));
+
   requestAnimationFrame(() => { const s = dom.scroll; s.scrollTop = s.scrollHeight; });
 }
 
@@ -299,6 +444,7 @@ async function runTeacher(opts = {}) {
   state.streaming = true;
   state.abort = new AbortController();
   setComposerBusy(true);
+  studySetFocusMode(true);
 
   const liveBubble = () => {
     const node = dom.messages.querySelector('[data-mid="' + pendingMsg.id + '"] .msg__bubble');
@@ -309,29 +455,68 @@ async function runTeacher(opts = {}) {
   let think = '';
   let paintTimer = 0;
   let lastPaint = 0;
+  // ---- 增量渲染的状态 ----
+  let bodyEl = null;     // 盛放已固化块的容器
+  let tailEl = null;     // 只重渲染的"最后一块"
+  let committed = 0;     // 已固化的块数
+
+  const stickToBottom = () => {
+    if (!state.autoScroll) return;
+    // 直接赋值 scrollTop 是瞬时的。以前这里配合 CSS 的 scroll-behavior:smooth，
+    // 每 90ms 就会重启一次平滑滚动动画，滚动永远停不下来 —— 卡顿主因之一。
+    const s = dom.scroll;
+    s.scrollTop = s.scrollHeight;
+  };
+
+  const resetStreamDom = (b) => {
+    b.innerHTML = '';
+    bodyEl = el('div', { class: 'msg__body' });
+    tailEl = el('div', { class: 'blk blk--tail' });
+    bodyEl.append(tailEl);
+    b.append(bodyEl);
+    committed = 0;
+  };
 
   const doPaint = () => {
     const b = liveBubble();
     if (!b) return;
     b.classList.add('is-streaming');
-    b.innerHTML = '';
 
     if (!acc) {
       // 正文还没开始：只给一个干净的等待提示。
-      // 注意不要把 reasoning_content 原文倒进气泡 —— 那是模型的草稿，不是讲给学生听的话，
-      // 而且流式结束重绘时它又会消失，看起来像闪烁出错。
+      // 不要把 reasoning_content 原文倒进来 —— 那是模型的草稿，不是讲给学生听的话。
+      bodyEl = null; tailEl = null; committed = 0;
+      b.innerHTML = '';
       b.append(el('div', { class: 'msg__waiting' }, [
         el('span', { class: 'spinner' }),
         el('span', { text: think ? '先生正在推敲…' : '先生正在读题…' }),
       ]));
       if (think) b.append(el('div', { class: 'msg__hint', text: '已经想了 ' + think.length + ' 字' }));
-    } else {
-      const body = el('div');
-      renderInto(body, acc);
-      b.append(body);
+      stickToBottom();
+      return;
     }
 
-    if (state.autoScroll) dom.scroll.scrollTop = dom.scroll.scrollHeight;
+    if (!bodyEl || !b.contains(bodyEl)) resetStreamDom(b);
+
+    const blocks = splitBlocks(acc);
+    if (!blocks.length) { stickToBottom(); return; }
+
+    // 关键优化：除最后一块（可能还没写完）外，其余每块只渲染一次，之后再也不碰。
+    // 原做法是每次刷新都 innerHTML='' 重建整条回答，重跑全部 Markdown 解析 + KaTeX ——
+    // 实测比这个慢 10.4 倍（10.4ms vs 1.0ms / 次）。
+    const ready = blocks.length - 1;
+    for (let i = committed; i < ready; i++) {
+      const node = el('div', { class: 'blk' });
+      renderInto(node, blocks[i]);
+      bodyEl.insertBefore(node, tailEl);
+    }
+    if (ready > committed) committed = ready;
+
+    // 只重渲染尾块（通常是最后那个还在增长的段落）
+    tailEl.innerHTML = '';
+    renderInto(tailEl, blocks[blocks.length - 1]);
+
+    stickToBottom();
   };
   const paint = () => {
     if (paintTimer) return;
@@ -379,6 +564,7 @@ async function runTeacher(opts = {}) {
     state.streaming = false;
     state.abort = null;
     setComposerBusy(false);
+    if (document.activeElement !== dom.input) studySetFocusMode(false);
     renderChat();
   }
 }
@@ -450,6 +636,15 @@ export function initStudy(opts = {}) {
   });
   dom.input.addEventListener('input', autoGrow);
 
+  /* 磨砂聚焦：输入框聚焦时把左右面板压下去 */
+  const setFocusMode = (on) => {
+    if ((store.state.prefs && store.state.prefs.focusMode) === false) return;
+    document.body.classList.toggle('chat-focus', !!on);
+  };
+  dom.input.addEventListener('focus', () => setFocusMode(true));
+  dom.input.addEventListener('blur', () => { if (!state.streaming) setFocusMode(false); });
+  studySetFocusMode = setFocusMode;
+
   function autoGrow() {
     dom.input.style.height = 'auto';
     dom.input.style.height = Math.min(190, dom.input.scrollHeight) + 'px';
@@ -493,18 +688,19 @@ let onCollect = () => {};
 
 export async function openSection(sectionId, { silent = false } = {}) {
   state.sectionId = sectionId;
+  state.msgLimit = MSG_PAGE;   // 切换章节时重置分页
   store.setPref('lastSection', sectionId);
   store.markStudying(sectionId);
+  markVisited(sectionId);   // 本次会话标记（灰色字体），刷新页面即清空
   renderTopbar();
   renderLeft();
   renderRight();
   renderChat();
 
-  const chat = store.chatOf(sectionId);
-  const hasVisible = chat.messages.some((m) => !m.hidden);
-  if (!hasVisible && !silent) {
-    await ensureOpening();
-  }
+  // 这里原本会自动调用 ensureOpening()（每次进新章节自动发一次请求）。
+  // 已移除：改为由开场卡片上的「开始本节课」按钮触发，避免在你还没决定学哪一节时
+  // 就消耗 token，也避免刚进页面就开始流式渲染造成卡顿。
+  void silent;
 }
 
 export function currentSection() { return state.sectionId; }

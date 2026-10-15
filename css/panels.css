@@ -11,10 +11,12 @@
   z-index: var(--z-drawer);
   display: flex;
   flex-direction: column;
+  /* 用"工具纸"而不是"书页纸"：饱和度更低（26% vs 56%），读起来像打印纸而不是旧书页。
+     两者明度只差 1.2%，靠饱和度分层，并排时才看得出是两种纸。 */
   background:
-    radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, .55), transparent 45%),
-    repeating-linear-gradient(0deg, rgba(150, 128, 92, .04) 0 1px, transparent 1px 3px),
-    linear-gradient(180deg, var(--paper-warm), var(--paper) 30%, var(--paper-deep));
+    radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, .5), transparent 45%),
+    repeating-linear-gradient(38deg, rgba(140, 120, 90, .035) 0 1px, transparent 1px 5px),
+    linear-gradient(180deg, var(--tool), var(--tool-2));
   box-shadow: 0 0 70px rgba(0, 0, 0, .6);
   transition: transform .34s cubic-bezier(.25,.8,.3,1);
 }
@@ -295,7 +297,7 @@
   font-size: 12.5px;
   line-height: 1.7;
   background: rgba(246, 233, 196, .55);
-  border: 1px solid rgba(201, 162, 39, .35);
+  border: 1px solid rgba(168, 148, 100, .35);
   color: #6b5220;
   margin-bottom: 14px;
 }

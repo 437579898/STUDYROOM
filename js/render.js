@@ -41,7 +41,25 @@ const blockMath = {
   },
 };
 
-marked.use({ gfm: true, breaks: true, extensions: [blockMath, inlineMath] });
+/**
+ * 关键公式强调：==...==  →  <mark class="fx">
+ * 用 ==...== 而不是直接给所有公式上色，是为了让"先生"自己判断哪一条是重点。
+ * 满屏都高亮等于没有重点 —— 这正是这次配色改造要修的病。
+ * 内部照常走行内解析，所以 ==$GM = gR^2$== 里的公式会被 KaTeX 正常渲染。
+ */
+const highlight = {
+  name: 'highlight',
+  level: 'inline',
+  start(src) { const i = src.indexOf('=='); return i < 0 ? undefined : i; },
+  tokenizer(src) {
+    const m = /^==(?=\S)([\s\S]*?\S)==(?!==)/.exec(src);
+    if (m) return { type: 'highlight', raw: m[0], text: m[1], tokens: this.lexer.inlineTokens(m[1]) };
+    return undefined;
+  },
+  renderer(t) { return '<mark class="fx">' + this.parser.parseInline(t.tokens) + '</mark>'; },
+};
+
+marked.use({ gfm: true, breaks: true, extensions: [highlight, blockMath, inlineMath] });
 
 /* --------------------------- 清洗 --------------------------- */
 const DANGEROUS = /<\s*\/?\s*(script|iframe|object|embed|link|meta|style|base|form|input|button)\b[^>]*>/gi;
@@ -196,6 +214,55 @@ export function renderHTML(markdown) {
 
 const FENCE = /\x60{3}[\s\S]*?\x60{3}/g;
 const TICK = /\x60([^\x60]*)\x60/g;
+
+/**
+ * 把累计文本按 Markdown 块切开 —— 流式增量渲染用。
+ *
+ * 为什么要感知围栏：plot 代码块和 $$...$$ 块**内部可以有空行**，
+ * 直接按空行切会把这些块切坏（一张图被拆成两段）。
+ * 这里跟踪围栏状态，围栏内的空行不切。
+ *
+ * 返回的数组里，**只有最后一块可能还没写完**，前面的都可以安全固化。
+ */
+export function splitBlocks(text) {
+  const src = String(text == null ? '' : text);
+  if (!src) return [];
+  const lines = src.split('\n');
+  const blocks = [];
+  let cur = [];
+  let fence = null;   // 'code' 或 'math'
+
+  const flush = () => { if (cur.length) { blocks.push(cur.join('\n')); cur = []; } };
+
+  for (const line of lines) {
+    const t = line.trim();
+
+    if (fence === 'code') {
+      cur.push(line);
+      if (/^\x60\x60\x60/.test(t)) fence = null;
+      continue;
+    }
+    if (fence === 'math') {
+      cur.push(line);
+      if (/\$\$/.test(t)) fence = null;
+      continue;
+    }
+
+    if (/^\x60\x60\x60/.test(t)) { fence = 'code'; cur.push(line); continue; }
+    if (/^\$\$/.test(t)) {
+      cur.push(line);
+      const rest = t.slice(2);
+      // 单行的 $$...$$ 自己就闭合了，不算开围栏
+      if (!(rest.length > 0 && /\$\$\s*$/.test(rest))) fence = 'math';
+      continue;
+    }
+
+    if (t === '') { flush(); continue; }
+    cur.push(line);
+  }
+  flush();
+  return blocks;
+}
 
 /** 纯文本预览（去掉 markdown 标记） */
 export function plainText(markdown, max = 150) {

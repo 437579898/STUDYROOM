@@ -4,31 +4,46 @@
    =========================================================== */
 
 :root {
-  /* 纸张与墨色 */
+  /* ---------- 纸张与墨色 ---------- */
   --paper:        #f7f1e3;
   --paper-warm:   #f2e9d6;
   --paper-deep:   #e8dcc2;
   --paper-edge:   #d8c9a8;
+  /* 工具纸：比书页略冷（饱和度 56%→26%），用来和"书页纸"分层。
+     不靠明度分层（两者明度只差 1.2%），靠饱和度，并排时才看得出是两种纸。 */
+  --tool:         #f1ece1;
+  --tool-2:       #e8e1d3;
+  --tool-edge:    #d3c9b5;
+
   --ink:          #2b2318;
   --ink-2:        #574733;
-  --ink-3:        #8a7a63;
-  --ink-4:        #b3a48c;
+  --ink-3:        #7d6c53;   /* 原来 #8a7a63，压暗一档把文字层级拉开 */
+  --ink-4:        #a89880;
 
-  /* 牛皮与鎏金 */
+  /* ---------- 牛皮 ---------- */
   --leather:      #8a5a2b;
   --leather-dark: #5b3818;
   --leather-deep: #3d2410;
-  --gold:         #c9a227;
-  --gold-light:   #e8cf8c;
-  --gold-deep:    #8f6f16;
 
-  /* 书桌 */
-  --desk:    #241a12;
-  --desk-2:  #3a281a;
-  --desk-3:  #16100a;
+  /* ---------- 金 = 主导色（哑光黄铜） ----------
+     这是本次配色的核心改动：原来 --gold/--gold-deep 的饱和度是 68%/73%，
+     到处用等于"满屏都是重点"。现在降饱和成哑光黄铜，它就成了底色的一部分，
+     只把亮金留给真正的焦点。 */
+  --gold:         #a89464;   /* 哑光黄铜（原 #c9a227，饱和 68%→28%） */
+  --gold-deep:    #8a7434;   /* 边框/分隔线（原 #8f6f16，饱和 73%→45%） */
+  --gold-light:   #e8cf8c;   /* 焦点金：只给"当前选中项"，全书仅 3~4 处 */
+  --brass:        #a89464;
+  --brass-light:  #cbb98d;
+  --brass-deep:   #7d6b42;
+  --seal:         #c9a227;   /* 印章金，极小面积（书本封面那枚印） */
 
-  /* 学科色 */
-  --math:    #96602c;
+  /* ---------- 书桌（饱和度 33% → 21%，把"暖"让给纸和皮革） ---------- */
+  --desk:    #221c16;
+  --desk-2:  #2c241c;
+  --desk-3:  #16110c;
+
+  /* ---------- 学科色（数学从 29° 挪到 23°，和皮革的 29.7° 分开） ---------- */
+  --math:    #a05f38;
   --physics: #3f5f92;
   --biology: #40714f;
 
@@ -38,6 +53,21 @@
   --danger:  #a8402f;
 
   --think-border: rgba(140, 115, 75, .32);
+
+  /* ---------- 公式强调：干玫瑰（取自"素笺干玫瑰"那套） ----------
+     纸上对比度 5.58:1（正文墨色是 13.75:1），所以这是"加重"不是"喊叫"。
+     底色透明度控制在 26~34%：实测超过 34% 就退化成色块了。 */
+  --accent:       #8a4f59;
+  --accent-light: #b0747f;
+  --accent-wash:  rgba(176, 116, 127, .30);
+
+  /* 左侧章节树的两个状态色（深色面板上用）
+     紫 = 该节生成过会话（永久，跟着对话记录走）
+     灰 = 本次浏览网页时打开过（仅本次，刷新即清）
+     两者同时成立时，灰优先。
+     质感要求：纯平色，不加渐变、不加发光、不加任何闪烁。 */
+  --state-conversation: #9b8cb4;   /* 深面板上 5.55:1 */
+  --state-visited:      #7d7565;   /* 深面板上 3.76:1 */
   --line:        rgba(120, 100, 70, .28);
   --line-soft:   rgba(120, 100, 70, .16);
   --shadow-sm:   0 2px 8px rgba(40, 28, 14, .16);
@@ -74,7 +104,7 @@ body {
 
 button, input, textarea, select { font-family: inherit; font-size: inherit; color: inherit; }
 button { cursor: pointer; border: none; background: none; }
-::selection { background: rgba(201, 162, 39, .35); }
+::selection { background: rgba(168, 148, 100, .35); }
 
 /* ------------------------------ 滚动条 ------------------------------ */
 .scroll { overflow-y: auto; overscroll-behavior: contain; }
@@ -154,7 +184,7 @@ button { cursor: pointer; border: none; background: none; }
   gap: 7px;
   padding: 6px 13px 6px 11px;
   border-radius: 999px;
-  border: 1px solid rgba(232, 207, 140, .2);
+  border: 1px solid rgba(203, 185, 141, .2);
   background: rgba(20, 14, 8, .74);
   color: #cfc2a5;
   font-size: 11.5px;
@@ -168,7 +198,7 @@ button { cursor: pointer; border: none; background: none; }
   white-space: nowrap;
 }
 .save-pill.is-on { opacity: 1; transform: none; pointer-events: auto; }
-.save-pill:hover { border-color: rgba(232, 207, 140, .5); color: #f2e6c8; }
+.save-pill:hover { border-color: rgba(203, 185, 141, .5); color: #f2e6c8; }
 
 .save-pill .dot {
   width: 7px; height: 7px;
@@ -190,27 +220,27 @@ button { cursor: pointer; border: none; background: none; }
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: linear-gradient(160deg, rgba(255, 236, 198, .13), rgba(255, 236, 198, .04));
-  border: 1px solid rgba(232, 207, 140, .28);
+  background: linear-gradient(160deg, rgba(226, 213, 184, .13), rgba(226, 213, 184, .04));
+  border: 1px solid rgba(203, 185, 141, .28);
   box-shadow: 0 6px 18px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .09);
   backdrop-filter: blur(6px);
   transition: transform .18s ease, border-color .18s ease, background .18s ease;
 }
 .corner-btn:hover {
   transform: translateY(-2px);
-  border-color: rgba(232, 207, 140, .6);
-  background: linear-gradient(160deg, rgba(255, 236, 198, .22), rgba(255, 236, 198, .07));
+  border-color: rgba(203, 185, 141, .6);
+  background: linear-gradient(160deg, rgba(226, 213, 184, .22), rgba(226, 213, 184, .07));
 }
 .corner-btn:active { transform: translateY(0) scale(.96); }
 .corner-btn.is-on {
   border-color: var(--gold-light);
-  background: linear-gradient(160deg, rgba(232, 207, 140, .34), rgba(232, 207, 140, .14));
+  background: linear-gradient(160deg, rgba(203, 185, 141, .34), rgba(203, 185, 141, .14));
 }
 
 .shape-square, .shape-diamond {
   display: block;
   background: linear-gradient(145deg, var(--gold-light), var(--gold-deep));
-  box-shadow: 0 0 10px rgba(232, 207, 140, .35);
+  box-shadow: 0 0 10px rgba(203, 185, 141, .35);
 }
 .shape-square { width: 17px; height: 17px; border-radius: 3px; }
 .shape-diamond { width: 15px; height: 15px; border-radius: 2px; transform: rotate(45deg); }
@@ -239,7 +269,7 @@ button { cursor: pointer; border: none; background: none; }
   padding: 4px 9px;
   border-radius: 6px;
   background: rgba(20, 13, 7, .94);
-  border: 1px solid rgba(232, 207, 140, .25);
+  border: 1px solid rgba(203, 185, 141, .25);
   color: var(--gold-light);
   font-size: 12px;
   white-space: nowrap;
@@ -297,7 +327,7 @@ button { cursor: pointer; border: none; background: none; }
 }
 .input:focus, .textarea:focus, .select:focus {
   border-color: var(--gold);
-  box-shadow: inset 0 1px 3px rgba(120, 100, 70, .1), 0 0 0 3px rgba(201, 162, 39, .18);
+  box-shadow: inset 0 1px 3px rgba(120, 100, 70, .1), 0 0 0 3px rgba(168, 148, 100, .18);
 }
 .textarea { resize: vertical; min-height: 84px; line-height: 1.6; }
 
@@ -369,8 +399,8 @@ button { cursor: pointer; border: none; background: none; }
   display: flex;
   flex-direction: column;
   border-radius: var(--r-lg);
-  background: linear-gradient(180deg, rgba(255, 255, 255, .5), transparent 120px), var(--paper);
-  border: 1px solid var(--paper-edge);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .5), transparent 120px), var(--tool);
+  border: 1px solid var(--tool-edge);
   box-shadow: var(--shadow-lg);
   transition: opacity .2s ease, transform .22s cubic-bezier(.2,.9,.3,1.1);
 }
@@ -407,7 +437,7 @@ button { cursor: pointer; border: none; background: none; }
   padding: 9px 16px;
   border-radius: 999px;
   background: rgba(24, 16, 9, .95);
-  border: 1px solid rgba(232, 207, 140, .3);
+  border: 1px solid rgba(203, 185, 141, .3);
   color: #f6ecd6;
   font-size: 13px;
   box-shadow: var(--shadow-md);
