@@ -196,7 +196,12 @@ function render(q) {
     else if (row.kind === 'wrong') node = wrongRow(row, q);
     else node = memoRow(row, q);
 
-    node.addEventListener('click', () => activate(flat.length));
+    // 索引必须在建节点时就固定下来。原来写的是 activate(flat.length)，
+    // 那个 length 是**点击那一刻**才求值的（那时 flat 已经装满），
+    // 等于 activate(总数) → flat[总数] 是 undefined → 直接 return，点了没反应。
+    const idx = flat.length;
+    node.addEventListener('mousedown', (e) => e.preventDefault());  // 按下不抢输入框焦点
+    node.addEventListener('click', () => activate(idx));
     dom.results.append(node);
     flat.push(row);
   }
@@ -252,11 +257,26 @@ export function initSearch(opts) {
   $('#search-close').addEventListener('click', closeSearch);
 
   dom.input.addEventListener('input', () => render(dom.input.value.trim()));
-  dom.input.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); if (flat.length) { sel = (sel + 1) % flat.length; paintSel(); } }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); if (flat.length) { sel = (sel - 1 + flat.length) % flat.length; paintSel(); } }
-    else if (e.key === 'Enter') { e.preventDefault(); activate(sel); }
-    else if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
+
+  // 键盘监听挂在**整个面板**上而不是只挂 input：
+  // 点过某条结果后焦点会落到那个 <button> 上，原来只有 input 收 keydown，
+  // 于是回车完全没反应。挂在 pop 上，里面任何元素聚焦都能用。
+  dom.pop.addEventListener('keydown', (e) => {
+    // 中文输入法选词时的回车是"确认候选"，不能当成"进入结果"
+    if (e.isComposing || e.key === 'Process') return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (flat.length) { sel = (sel + 1) % flat.length; paintSel(); }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (flat.length) { sel = (sel - 1 + flat.length) % flat.length; paintSel(); }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();   // 同时阻止焦点在 <button> 上时浏览器再合成一次 click
+      if (flat.length) activate(sel);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeSearch();
+    }
   });
 }
 
