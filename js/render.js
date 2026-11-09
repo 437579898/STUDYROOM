@@ -8,7 +8,10 @@ import { makePlotFigure, hydratePlots } from './math.js';
 const marked = window.marked.marked || window.marked;
 const katex = window.katex;
 
-const KATEX = { throwOnError: false, strict: false, trust: false, output: 'html', macros: { '\\R': '\\mathbb{R}' } };
+// throwOnError: true —— 出错时让 KaTeX 抛，我们用 catch 兜成 <code>。
+// 原来设 false，KaTeX 会把整段源码染红铺在页面上（还带一大坨 title 提示框），
+// 一次公式写错就整块内容看不清。
+const KATEX = { throwOnError: true, strict: false, trust: false, output: 'html', macros: { '\\R': '\\mathbb{R}' } };
 
 /* --------------------------- 数学扩展 --------------------------- */
 const inlineMath = {
@@ -29,15 +32,51 @@ const inlineMath = {
 const blockMath = {
   name: 'blockMath',
   level: 'block',
-  start(src) { const i = src.indexOf('$$'); return i < 0 ? undefined : i; },
+  // 只在「行首」报告位置。原来返回行中任意 $$ 的下标，会让 marked 的块解析
+  // 把这一行从 $$ 处切开再拼回去——拼回来的 raw 里凭空多出换行符，
+  // 于是 ==$$…$$== 这种强调直接被拆散（实测 raw 从
+  //   "==$$a^2=…$$==" 变成 "==\n$$a^2=…\n$$=="）。
+  // 行中的 $$ 由 inlineDisplayMath 负责。
+  start(src) {
+    const m = /\n\$\$/.exec(src);
+    if (m) return m.index + 1;
+    return src.startsWith('$$') ? 0 : undefined;
+  },
   tokenizer(src) {
     const m = /^\$\$([\s\S]+?)\$\$[ \t]*(?:\n|$)/.exec(src);
-    if (m) return { type: 'blockMath', raw: m[0], text: m[1].trim() };
-    return undefined;
+    if (!m) return undefined;
+    // 不许跨空行。跨空行说明这两个 $$ 根本不在同一个段落里，
+    // 典型是「==$$…$$==」这种写法：结尾的 $$ 后面跟着 "=="，
+    // 惰性匹配会一路吃到后面某个段落的 $$ 为止，
+    // 结果整段文字被当成一个公式丢给 KaTeX（真实踩过的坑）。
+    if (/\n[ \t]*\n/.test(m[1])) return undefined;
+    return { type: 'blockMath', raw: m[0], text: m[1].trim() };
   },
   renderer(t) {
     try { return katex.renderToString(t.text, { ...KATEX, displayMode: true }); }
     catch { return '<pre><code>' + esc(t.text) + '</code></pre>'; }
+  },
+};
+
+/**
+ * 行内出现的 $$...$$（display 公式）。
+ * marked 的 blockMath 只在"行首"生效，而 ==$$…$$== 这种写法里 $$ 不在行首，
+ * 于是 $$ 会被当普通字符、还可能被行内 $…$ 规则错配。
+ * 这条规则补上行内位置，照样用 displayMode 渲染。
+ */
+const inlineDisplayMath = {
+  name: 'inlineDisplayMath',
+  level: 'inline',
+  start(src) { const i = src.indexOf('$$'); return i < 0 ? undefined : i; },
+  tokenizer(src) {
+    const m = /^\$\$([\s\S]+?)\$\$(?!\$)/.exec(src);
+    if (!m) return undefined;
+    if (/\n[ \t]*\n/.test(m[1])) return undefined;   // 同样不跨空行
+    return { type: 'inlineDisplayMath', raw: m[0], text: m[1].trim() };
+  },
+  renderer(t) {
+    try { return katex.renderToString(t.text, { ...KATEX, displayMode: true }); }
+    catch { return '<code>' + esc(t.text) + '</code>'; }
   },
 };
 
@@ -59,7 +98,9 @@ const highlight = {
   renderer(t) { return '<mark class="fx">' + this.parser.parseInline(t.tokens) + '</mark>'; },
 };
 
-marked.use({ gfm: true, breaks: true, extensions: [highlight, blockMath, inlineMath] });
+// 顺序有意义：highlight 最先（它整体吃掉 ==…== 再让内部重新走行内规则），
+// inlineDisplayMath 必须在 inlineMath 之前，否则 $$ 的第二个 $ 会被当作行内公式开头。
+marked.use({ gfm: true, breaks: true, extensions: [highlight, inlineDisplayMath, blockMath, inlineMath] });
 
 /* --------------------------- 清洗 --------------------------- */
 const DANGEROUS = /<\s*\/?\s*(script|iframe|object|embed|link|meta|style|base|form|input|button)\b[^>]*>/gi;
