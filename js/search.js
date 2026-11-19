@@ -27,6 +27,32 @@ for (const s of subjects()) {
   }
 }
 
+/** sectionId → 索引记录的查表（搜索历史要按 id 还原成一行） */
+const BY_ID = new Map(INDEX.map((r) => [r.sectionId, r]));
+
+/* ---------------- 搜索历史：最近通过搜索进入的章节 ----------------
+   存在 store.state.prefs.searchHistory —— 服务端模式下就是 data/state.json 的一份，
+   所以重开浏览器、换设备都还在。只记「从搜索里点进去」的，从左侧章节树点的不记。 */
+const HISTORY_MAX = 20;   // 最多存多少条
+const HISTORY_SHOW = 5;   // 空查询时最多列这么多
+
+function historyIds() {
+  const v = store.state && store.state.prefs && store.state.prefs.searchHistory;
+  return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+}
+
+/** 把这一节提到最前（自动去重、限长） */
+function pushHistory(sectionId) {
+  if (!sectionId || !BY_ID.has(sectionId)) return;
+  const next = [sectionId, ...historyIds().filter((id) => id !== sectionId)].slice(0, HISTORY_MAX);
+  store.setPref('searchHistory', next);
+}
+
+/** 空查询时显示的「最近搜到」：最多 5 条，目录里查不到的老 id 自动跳过 */
+function recentRecords() {
+  return historyIds().map((id) => BY_ID.get(id)).filter(Boolean).slice(0, HISTORY_SHOW);
+}
+
 /** 命中高亮（先转义再插标签，避免 XSS） */
 function hl(text, q) {
   const raw = String(text == null ? '' : text);
@@ -103,7 +129,12 @@ let hooks = { onPickSection: () => {}, onOpenDrawer: () => {} };
 function buildRows(q) {
   const rows = [];
   if (!q) {
-    // 空查询：给一点引导，而不是空白
+    // 空查询：先列「最近通过搜索进入的章节」，再给引导
+    const recent = recentRecords();
+    if (recent.length) {
+      rows.push({ kind: 'group', text: '最 近 搜 到 的 · ' + recent.length });
+      for (const rec of recent) rows.push({ kind: 'history', data: { rec, why: [] } });
+    }
     if (!Object.keys(CONCEPTS).length) {
       rows.push({ kind: 'hint', text: '概念索引未加载，目前只能按章节名搜索' });
     }
@@ -139,10 +170,13 @@ function buildRows(q) {
   return rows;
 }
 
-function sectionRow(r, q) {
+function sectionRow(r, q, opts = {}) {
   const rec = r.data.rec;
-  const node = el('button', { class: 'search-item', dataset: { kind: 'section' } }, [
-    el('div', { class: 'search-item__path', html: esc(rec.subject.name) + ' › ' + esc(rec.volume.name) + ' › ' + esc(rec.chapter.name) }),
+  const node = el('button', { class: 'search-item', dataset: { kind: opts.kind || 'section' } }, [
+    el('div', { class: 'search-item__path' }, [
+      opts.badge ? el('span', { class: 'search-item__badge', text: opts.badge }) : null,
+      el('span', { html: esc(rec.subject.name) + ' › ' + esc(rec.volume.name) + ' › ' + esc(rec.chapter.name) }),
+    ]),
     el('div', { class: 'search-item__name', html: esc(rec.section.no) + '　' + hl(rec.section.name, q) }),
   ]);
   if (rec.concepts.length) {
@@ -193,6 +227,7 @@ function render(q) {
 
     let node;
     if (row.kind === 'section') node = sectionRow(row, q);
+    else if (row.kind === 'history') node = sectionRow(row, '', { kind: 'history', badge: '最近' });
     else if (row.kind === 'wrong') node = wrongRow(row, q);
     else node = memoRow(row, q);
 
@@ -206,7 +241,7 @@ function render(q) {
     flat.push(row);
   }
 
-  dom.count.textContent = q ? (flat.length + ' 条结果') : '';
+  dom.count.textContent = q ? (flat.length + ' 条结果') : (flat.length ? '最近 ' + flat.length + ' 条' : '');
   paintSel();
 }
 
@@ -220,9 +255,11 @@ function paintSel() {
 function activate(i) {
   const row = flat[i];
   if (!row) return;
-  if (row.kind === 'section') {
+  if (row.kind === 'section' || row.kind === 'history') {
+    const id = row.data.rec.sectionId;
     closeSearch();
-    hooks.onPickSection(row.data.rec.sectionId);
+    pushHistory(id);          // 只有「从搜索里点进去」才记，左侧章节树点的不记
+    hooks.onPickSection(id);
   } else if (row.kind === 'wrong') {
     closeSearch();
     hooks.onOpenDrawer('wrongbook');

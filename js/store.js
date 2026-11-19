@@ -11,12 +11,14 @@ function blank() {
     chats: {},                    // sectionId -> { messages:[], updatedAt }
     wrongbook: { items: [] },
     memos: { items: [] },
+    assistant: { messages: [] },      // 复习助手的对话（能看到全部记录，和每节的 chats 分开存）
     prefs: {
       lastSubject: null,
       lastVolume: null,
       lastSection: null,
       leftOpen: true,
       rightOpen: true,
+      searchHistory: [],          // 最近通过搜索进入的章节（sectionId，新的在前，最多 20）
     },
   };
 }
@@ -31,9 +33,14 @@ function normalize(raw) {
       if (v && Array.isArray(v.messages)) s.chats[k] = { messages: v.messages, updatedAt: v.updatedAt || Date.now() };
     }
   }
+  if (raw.assistant && Array.isArray(raw.assistant.messages)) s.assistant.messages = raw.assistant.messages;
   if (raw.wrongbook && Array.isArray(raw.wrongbook.items)) s.wrongbook.items = raw.wrongbook.items;
   if (raw.memos && Array.isArray(raw.memos.items)) s.memos.items = raw.memos.items;
   if (raw.prefs && typeof raw.prefs === 'object') Object.assign(s.prefs, raw.prefs);
+  // 搜索历史只接受字符串数组：state.json 被手工改过 / 旧版本没有这个字段时都能兜住
+  s.prefs.searchHistory = Array.isArray(s.prefs.searchHistory)
+    ? s.prefs.searchHistory.filter((x) => typeof x === 'string').slice(0, 20)
+    : [];
   return s;
 }
 
@@ -226,6 +233,21 @@ class Store {
   removeMemo(id) {
     this.state.memos.items = this.state.memos.items.filter((x) => x.id !== id);
     this.touch({ type: 'memo' });
+  }
+
+  /* ------------------------- 复习助手 ------------------------- */
+  assistantOf() {
+    if (!this.state.assistant || !Array.isArray(this.state.assistant.messages)) this.state.assistant = { messages: [] };
+    return this.state.assistant;
+  }
+  updateAssistantMessage(id, patch) {
+    const m = this.assistantOf().messages.find((x) => x.id === id);
+    if (m) { Object.assign(m, patch); this.touch({ type: 'assistant' }); }
+    return m;
+  }
+  clearAssistant() {
+    this.state.assistant = { messages: [] };
+    this.touch({ type: 'assistant' });
   }
 
   /* ------------------------- 偏好 ------------------------- */

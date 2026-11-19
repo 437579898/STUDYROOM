@@ -20,7 +20,7 @@
 <script defer src="vendor/katex/katex.min.js"></script>
 <script defer src="vendor/katex/contrib/mhchem.min.js"></script>
 <script defer src="vendor/marked.min.js"></script>
-<script defer src="js/app.js" type="module"></script>
+<script defer src="js/app.js?v=1.9.0" type="module"></script>
 </head>
 <body>
 
@@ -47,6 +47,10 @@
   <button class="corner-btn" id="btn-search" aria-label="搜索章节">
     <span class="mag-glyph">⌕</span>
     <span class="tip">搜索章节 / 概念</span>
+  </button>
+  <button class="corner-btn" id="btn-assistant" aria-label="复习助手">
+    <span class="asst-glyph">✦</span>
+    <span class="tip">复习助手 · 能翻你全部记录</span>
   </button>
 </div>
 
@@ -112,11 +116,14 @@
 
       <div class="composer">
         <div class="quick-row" id="quick-row"><span class="label">快 捷</span></div>
+        <div class="composer__shots" id="composer-shots" hidden></div>
         <div class="composer__box">
+          <button class="composer__attach" id="btn-attach" type="button" title="发图片（也可以直接粘贴或拖进来）">＋</button>
           <textarea class="composer__input" id="composer-input" rows="1"
             placeholder="向先生提问，或回答他的问题…（Enter 发送，Shift + Enter 换行）"></textarea>
           <button class="composer__send" id="btn-send" title="发送">➤</button>
         </div>
+        <input type="file" id="file-input" accept="image/*" multiple hidden>
         <div class="composer__foot">
           <span>先生的讲解以人教版（2019）新课标为准</span>
           <span id="composer-model"></span>
@@ -245,6 +252,16 @@
         <span class="hint">常用：deepseek-chat（快）、deepseek-reasoner（会先思考再回答）。</span>
       </div>
       <div class="field">
+        <label>识图模型（可选）</label>
+        <input class="input" id="cfg-vision" placeholder="留空 = 不用（发图会失败）">
+        <span class="hint">
+          <b>留空即可</b>：DeepSeek 官方的 <code>deepseek-chat</code> 现在能识图（实测：能逐字读出图中的中文标题）。
+          只有把 API 地址换成<b>不支持视觉</b>的服务商时，才需要在这里填一个视觉模型兜底，例如
+          <code>qwen-vl-max</code>、<code>glm-4v</code>、<code>gpt-4o</code>。<br>
+          只对这一轮带图的请求生效，平时问问题仍用上面的模型。
+        </span>
+      </div>
+      <div class="field">
         <label>API Key</label>
         <input class="input" id="cfg-key" type="password" autocomplete="off" spellcheck="false">
         <span class="hint">只粘贴 sk- 开头的那一串，不要把「API Key：」这样的前缀一起复制进来（中文冒号会导致请求失败）。<br>密钥保存在本机服务端 data/config.json，不会写进浏览器缓存，也不会随页面发送到别处。</span>
@@ -334,6 +351,26 @@
     <span style="flex:1"></span>
     <button class="btn" data-close-modal="modal-settings">取消</button>
     <button class="btn btn--primary" id="cfg-save">保存</button>
+  </div>
+</div>
+
+
+<!-- ===================== 复习助手 ===================== -->
+<div class="modal modal--asst" id="modal-assistant" role="dialog" aria-modal="true">
+  <div class="modal__head">
+    <span class="modal__title">复 习 助 手</span>
+    <span class="asst-head-note">读过你全部的学习记录</span>
+    <button class="icon-btn" id="asst-clear" title="清空这个窗口的对话（学习记录不动）">⟲</button>
+    <button class="icon-btn" id="asst-close" aria-label="关闭">✕</button>
+  </div>
+  <div class="modal__body asst-body">
+    <div class="asst-list" id="asst-list"></div>
+    <div class="asst-composer">
+      <textarea class="composer__input" id="asst-input" rows="1"
+        placeholder="上次学到哪了 / 这块我学过吗 / 把最近的错题串一下…（Enter 发送）"></textarea>
+      <button class="composer__send" id="asst-send" title="发送">➤</button>
+    </div>
+    <div class="asst-foot" id="asst-foot">只依据你的学习记录回答，出处可点开</div>
   </div>
 </div>
 

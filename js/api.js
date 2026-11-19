@@ -32,6 +32,7 @@ const CODE_KEY = 'study-room.access-code';
 export const LOCAL_DEFAULTS = {
   baseUrl: 'https://api.deepseek.com/v1',
   model: 'deepseek-chat',
+  visionModel: '',
   temperature: 0.6,
   maxTokens: 4096,
   apiKey: '',
@@ -56,6 +57,7 @@ function maskLocal(cfg) {
   return {
     baseUrl: cfg.baseUrl,
     model: cfg.model,
+    visionModel: cfg.visionModel || '',
     temperature: cfg.temperature,
     maxTokens: cfg.maxTokens,
     hasKey: key.length > 0,
@@ -101,6 +103,11 @@ function normalizeBaseUrlClient(raw) {
   return s.replace(/\/+$/, '');
 }
 
+/* 最近一次读到的配置（只用来判断「有没有配识图模型」，不参与鉴权） */
+let LAST_CONFIG = null;
+export function visionConfigured() { return !!(LAST_CONFIG && LAST_CONFIG.visionModel); }
+export function currentModelName() { return LAST_CONFIG ? LAST_CONFIG.model : ''; }
+
 /* ===================== 服务端模式的小工具 ===================== */
 async function jsonFetch(url, opts = {}) {
   const res = await fetch(url, Object.assign({}, opts, { headers: buildHeaders(opts.headers) }));
@@ -114,45 +121,66 @@ async function jsonFetch(url, opts = {}) {
   return data;
 }
 
-/* ===================== SSE 解析（两种模式共用） ===================== */
+/* ===================== SSE 解析（两种模式共用） =====================
+   除了拼正文，这里还要回答一个以前没人问的问题：**这一路流到底正常收尾了吗？**
+   v1.7.2 之前只看 delta.content —— 上游中途断流时，服务端代理是静默 res.end() 的，
+   浏览器把「流结束」当作一次正常结束的答复，于是存下一条**没有正文的空消息**
+   （2026-11 真实踩过：只有思考过程，正文空白，用户以为"上一次对话被吞了"）。
+   所以现在统一返回 { text, thinking, finishReason, sawDone, upstreamError }，
+   由 study.js 决定要不要提示「这次没写完」。 */
 async function consumeStream(res, { onDelta, onThink }) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
   let full = '';
   let thinking = '';
+  let finishReason = '';
+  let sawDone = false;
+  let upstreamError = '';
+
+  const handleLine = (raw) => {
+    const line = raw.trim();
+    if (!line || line.startsWith(':') || !line.startsWith('data:')) return;
+    const payload = line.slice(5).trim();
+    if (payload === '[DONE]') { sawDone = true; return; }
+    let chunk;
+    try { chunk = JSON.parse(payload); } catch { return; }
+    // 服务端代理在上游断流时会补一帧 {"error":{...}}，别当成正常结束
+    if (chunk && chunk.error) {
+      upstreamError = String((chunk.error && chunk.error.message) || chunk.error);
+      return;
+    }
+    const choice = chunk.choices && chunk.choices[0];
+    if (choice && choice.finish_reason) finishReason = String(choice.finish_reason);
+    const delta = choice && choice.delta;
+    if (!delta) return;
+    if (delta.reasoning_content) {
+      thinking += delta.reasoning_content;
+      if (onThink) onThink(thinking);
+    }
+    if (delta.content) {
+      full += delta.content;
+      if (onDelta) onDelta(delta.content, full);
+    }
+  };
 
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-
     let idx;
     while ((idx = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, idx).trim();
+      const line = buffer.slice(0, idx);
       buffer = buffer.slice(idx + 1);
-      if (!line || line.startsWith(':') || !line.startsWith('data:')) continue;
-      const payload = line.slice(5).trim();
-      if (payload === '[DONE]') continue;
-      let chunk;
-      try { chunk = JSON.parse(payload); } catch { continue; }
-      const delta = chunk.choices && chunk.choices[0] && chunk.choices[0].delta;
-      if (!delta) continue;
-      if (delta.reasoning_content) {
-        thinking += delta.reasoning_content;
-        if (onThink) onThink(thinking);
-      }
-      if (delta.content) {
-        full += delta.content;
-        if (onDelta) onDelta(delta.content, full);
-      }
+      handleLine(line);
     }
   }
-  return { text: full, thinking };
+  if (buffer) handleLine(buffer);   // 最后一行可能没有换行符
+  return { text: full, thinking, finishReason, sawDone, upstreamError };
 }
 
 /* ===================== 纯网页模式：浏览器直连模型 ===================== */
-async function directChat({ messages, temperature, maxTokens, signal, onDelta, onThink, stream }) {
+async function directChat({ messages, temperature, maxTokens, signal, onDelta, onThink, stream, model }) {
   const cfg = readLocalConfig();
   if (!cfg.apiKey) {
     throw makeError('还没有配置 API Key。点右下角齿轮，填入你的 DeepSeek API Key。', { status: 400, error: 'NO_API_KEY' });
@@ -171,7 +199,8 @@ async function directChat({ messages, temperature, maxTokens, signal, onDelta, o
         accept: stream === false ? 'application/json' : 'text/event-stream',
       },
       body: JSON.stringify({
-        model: cfg.model,
+        model: (typeof model !== 'undefined' && model) ? model
+          : (cfg.visionModel && messages.some((m) => Array.isArray(m.content) && m.content.some((p) => p && p.type === 'image_url')) ? cfg.visionModel : cfg.model),
         messages,
         stream: stream !== false,
         temperature: temperature != null ? temperature : cfg.temperature,
@@ -245,9 +274,10 @@ export const api = {
 
   /* ---------------- 配置 ---------------- */
   async loadConfig() {
-    if (isStandalone()) return maskLocal(readLocalConfig());
+    if (isStandalone()) { LAST_CONFIG = maskLocal(readLocalConfig()); return LAST_CONFIG; }
     const d = await jsonFetch('api/config');
-    return d.config;
+    LAST_CONFIG = d.config;
+    return LAST_CONFIG;
   },
 
   async saveConfig(patch) {
@@ -263,6 +293,7 @@ export const api = {
 
       if (typeof patch.baseUrl === 'string') next.baseUrl = normalizeBaseUrlClient(patch.baseUrl);
       if (typeof patch.model === 'string' && patch.model.trim()) next.model = patch.model.trim();
+      if (typeof patch.visionModel === 'string') next.visionModel = patch.visionModel.trim();
       if (typeof patch.temperature === 'number' && Number.isFinite(patch.temperature)) next.temperature = patch.temperature;
       if (typeof patch.maxTokens === 'number' && Number.isFinite(patch.maxTokens)) next.maxTokens = patch.maxTokens;
 
@@ -276,7 +307,8 @@ export const api = {
       if (patch.clearKey === true) next.apiKey = '';
 
       writeLocalConfig(next);
-      return { config: maskLocal(next), notices };
+      LAST_CONFIG = maskLocal(next);
+      return { config: LAST_CONFIG, notices };
     }
 
     const d = await jsonFetch('api/config', { method: 'POST', body: JSON.stringify(patch) });
@@ -286,11 +318,11 @@ export const api = {
   /* ---------------- 对话 ---------------- */
   async chat(opts) {
     if (isStandalone()) return directChat(Object.assign({}, opts, { stream: true }));
-    const { messages, temperature, maxTokens, signal, onDelta, onThink } = opts;
+    const { messages, temperature, maxTokens, signal, onDelta, onThink, model } = opts;
     const res = await fetch('api/chat', {
       method: 'POST',
       headers: buildHeaders(),
-      body: JSON.stringify({ messages, stream: true, temperature, maxTokens }),
+      body: JSON.stringify({ messages, stream: true, temperature, maxTokens, model }),
       signal,
     });
     if (!res.ok) {
@@ -313,6 +345,32 @@ export const api = {
       body: JSON.stringify(Object.assign({ messages, stream: false }, extra)),
     });
     return d.data;
+  },
+
+  /* ---------------- 图片（对话识图） ---------------- */
+  /** 上传一张图片；纯网页模式直接转成 data URL 存进消息里 */
+  async uploadImage(blob, name) {
+    if (!blob) throw makeError('没有图片数据');
+    if (isStandalone()) {
+      const url = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result || ''));
+        fr.onerror = () => reject(makeError('读取图片失败'));
+        fr.readAsDataURL(blob);
+      });
+      return { url, local: true };
+    }
+    const res = await fetch('api/upload', {
+      method: 'POST',
+      headers: Object.assign({ 'content-type': blob.type || 'application/octet-stream' }, ACCESS_CODE ? { 'x-access-code': ACCESS_CODE } : {}),
+      body: blob,
+    });
+    let data = null;
+    try { data = await res.json(); } catch { /* ignore */ }
+    if (!res.ok || !data || data.ok === false) {
+      throw makeError((data && (data.message || data.error)) || ('图片上传失败 HTTP ' + res.status), { status: res.status, payload: data });
+    }
+    return { url: data.url, local: false };
   },
 
   /* ---------------- 纯网页模式专属 ---------------- */

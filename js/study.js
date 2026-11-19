@@ -4,6 +4,7 @@
 import { $, $$, el, toast, fmtTime, scrollToBottom, copyText, debounce } from './util.js';
 import { store } from './store.js';
 import { renderInto, plainText, extractFollowups, splitBlocks } from './render.js';
+import { prepareShot, toDataUrl, shotsNode, MAX_SHOTS } from './shots.js';
 import { askTeacher, openingInstruction } from './teacher.js';
 import {
   getSubject, getSectionWrap, getVolumeWrap, subjectColor,
@@ -28,6 +29,9 @@ const state = {
   autoScroll: true,
   opening: false,          // 开场请求进行中，防止重复点
   msgLimit: 30,            // 当前渲染最近多少条对话
+  pendingShots: [],        // 输入框里待发送的图片（已上传，存 url）
+  shotBusy: 0,             // 正在压缩/上传的图片张数
+  manyShotHinted: false,   // 一次发很多图时只提示一次
 };
 
 /* 本次会话里打开过的章节（只存在内存里，刷新页面即清空）。
@@ -281,6 +285,32 @@ function chatHero() {
   ]);
 }
 
+/* 一次回复没写完的四种情形（由 api.js 的 consumeStream 判定，存在 msg.cut 上） */
+const CUT_TEXT = {
+  length: '这次先生想得太久了：思考把输出的字数额度用光了，正文一个字都没来得及写。',
+  upstream: '这次回复被上游掐断了：思考过程收到了，正文一个字都没有。',
+  truncated: '这次回复在中途断了（没收到结束标记）：思考过程收到了，正文一个字都没有。',
+  partial: '这条回答没写完就断了，上面只是已经写出来的部分。',
+};
+
+/** 判断一条回复是不是"没写完"。
+    新消息由 api.js 判定后写在 msg.cut 上；旧消息（这个字段还不存在的年代）
+    只能从"正文为空 + 有思考"反推 —— 否则它就是一张永远的白卡片。 */
+function cutOf(msg) {
+  if (msg.cut) return msg.cut;
+  if (msg.pending || msg.error || msg.stopped) return '';
+  if (String(msg.content || '').trim()) return '';
+  return msg.thinking ? 'truncated' : '';
+}
+
+/** 「重来一次」：删掉这条残缺消息，用同样的历史重新问一遍 */
+function retryTeacher(msg) {
+  if (state.streaming) { toast('先生还在讲，先等等', ''); return; }
+  if (msg && msg.id) store.deleteMessage(state.sectionId, msg.id);
+  renderChat();
+  runTeacher();
+}
+
 function messageNode(msg) {
   const isUser = msg.role === 'user';
   if (msg.hidden) return null;
@@ -294,8 +324,19 @@ function messageNode(msg) {
     bubble.append(el('div', { text: msg.content }));
     if (msg.hint) bubble.append(el('div', { style: { marginTop: '8px', fontSize: '12.5px', opacity: '.85' }, text: msg.hint }));
   } else {
-    renderInto(bubble, msg.content);
+    const shots = shotsNode(msg.images);
+    if (shots) bubble.append(shots);
+    // renderInto 会写 innerHTML，所以文字必须放在自己的容器里 ——
+    // 直接 renderInto(bubble, …) 会把上面刚加进去的缩略图整个抹掉。
+    if (String(msg.content || '').trim()) {
+      const body = el('div', { class: 'msg__text md' });
+      renderInto(body, msg.content);
+      bubble.append(body);
+    }
   }
+  // 没写完的回复：必须在气泡里说清楚，别留一张白纸让人以为消息被吞了
+  const cut = isUser ? '' : cutOf(msg);
+  if (cut) bubble.append(el('div', { class: 'msg__cut', text: CUT_TEXT[cut] || CUT_TEXT.truncated }));
 
   const main = el('div', { class: 'msg__main' });
   main.append(el('div', { class: 'msg__name' }, [
@@ -318,8 +359,9 @@ function messageNode(msg) {
   // 操作条
   const actions = el('div', { class: 'msg__actions' });
   if (!msg.pending && !msg.error) {
-    actions.append(el('button', { class: 'btn btn--sm', text: '复制', onclick: () => copyText(msg.content) }));
-    if (!isUser) {
+    const hasText = !!String(msg.content || '').trim();
+    if (hasText) actions.append(el('button', { class: 'btn btn--sm', text: '复制', onclick: () => copyText(msg.content) }));
+    if (!isUser && hasText) {
       actions.append(el('button', {
         class: 'btn btn--sm', text: '收录错题',
         onclick: () => onCollect(msg),
@@ -327,6 +369,12 @@ function messageNode(msg) {
       actions.append(el('button', {
         class: 'btn btn--sm', text: '继续展开',
         onclick: () => send('请把这一点再展开讲一些，我还没完全理解。'),
+      }));
+    }
+    if (!isUser && cutOf(msg)) {
+      actions.append(el('button', {
+        class: 'btn btn--sm btn--retry', text: '重来一次',
+        onclick: () => retryTeacher(msg),
       }));
     }
     actions.append(el('button', {
@@ -427,12 +475,21 @@ function renderChat() {
 
 /* ---------------------------- 发送 ---------------------------- */
 async function send(text) {
-  if (state.streaming) { toast('先生还在讲，先等等', ''); return; }
+  if (state.streaming) { toast('先生还在讲，先等等', ''); return false; }
+  if (state.shotBusy) { toast('图片还在处理，等一下', ''); return false; }
   const t = String(text || '').trim();
-  if (!t) return;
-  store.pushMessage(state.sectionId, { role: 'user', content: t });
+  const shots = state.pendingShots.slice();
+  if (!t && !shots.length) return false;
+  store.pushMessage(state.sectionId, {
+    role: 'user',
+    content: t || (shots.length === 1 ? '（拍了张图）' : '（拍了 ' + shots.length + ' 张图）'),
+    images: shots.map((x) => ({ url: x.url, w: x.w, h: x.h, bytes: x.bytes, name: x.name })),
+  });
+  state.pendingShots = [];
+  renderShots();
   renderChat();
   await runTeacher();
+  return true;
 }
 
 async function runTeacher(opts = {}) {
@@ -528,11 +585,18 @@ async function runTeacher(opts = {}) {
     }, wait);
   };
 
+  let imageData = [];
   try {
     const historyForApi = chat.messages.filter((m) => m.id !== pendingMsg.id);
+    // 只把「最后一条用户消息」的图片带给模型（历史里的图片只留一句标记，见 teacher.js）
+    const lastUser = [...historyForApi].reverse().find((m) => m.role === 'user' && !m.hidden);
+    if (lastUser && Array.isArray(lastUser.images) && lastUser.images.length) {
+      imageData = (await Promise.all(lastUser.images.map((it) => toDataUrl(it.url)))).filter(Boolean);
+    }
     const res = await askTeacher({
       sectionId,
       history: historyForApi,
+      images: imageData,
       text: null,
       signal: state.abort.signal,
       onDelta: (_d, full) => { acc = full; paint(); },
@@ -540,23 +604,38 @@ async function runTeacher(opts = {}) {
     });
     acc = res.text || acc;
     const THINK_CAP = 6000;
+
+    // 这一路流到底正常收尾没有？以前不看，于是「只收到思考、没有正文」也被当成
+    // 一次正常答复存下来 —— 界面上就是一张白卡片（2026-11 真实踩过）。
+    let cut = '';
+    if (res.upstreamError) cut = 'upstream';
+    else if (res.finishReason === 'length') cut = 'length';
+    else if (!res.sawDone && !res.finishReason) cut = 'truncated';
+    if (cut && acc.trim()) cut = 'partial';
+
     store.updateMessage(sectionId, pendingMsg.id, {
       content: acc,
       pending: false,
       thinking: think ? think.slice(0, THINK_CAP) : undefined,
       thinkingCut: think.length > THINK_CAP ? think.length : undefined,
+      cut: cut || undefined,
+      finish: res.finishReason || undefined,
+      upstreamError: res.upstreamError || undefined,
     });
   } catch (e) {
     if (e.name === 'AbortError') {
       store.updateMessage(sectionId, pendingMsg.id, { content: acc || '（已停止）', pending: false, stopped: true });
     } else {
       const noKey = e.status === 400 && /NO_API_KEY|API Key/.test(String(e.message));
+      const noVision = /image|vision|multimodal|图片|不支持/i.test(String(e.message)) && imageData.length > 0;
       store.updateMessage(sectionId, pendingMsg.id, {
         content: '**连接不上模型服务。**\n\n' + String(e.message || e),
         pending: false, error: true,
         hint: noKey
           ? '点屏幕右下角的齿轮按钮，填入你的 DeepSeek API Key 后重试。'
-          : '检查网络，或点右下角齿轮确认 API 地址 / 模型名是否正确。',
+          : (noVision
+            ? '当前模型看不了图片：点右下角齿轮，在「识图模型」里填一个支持视觉的模型（gpt-4o / qwen-vl-max / glm-4v）。'
+            : '检查网络，或点右下角齿轮确认 API 地址 / 模型名是否正确。'),
       });
     }
   } finally {
@@ -564,8 +643,62 @@ async function runTeacher(opts = {}) {
     state.streaming = false;
     state.abort = null;
     setComposerBusy(false);
-    if (document.activeElement !== dom.input) studySetFocusMode(false);
     renderChat();
+  }
+}
+
+/* ---------------------------- 图片（识图） ---------------------------- */
+
+function renderShots() {
+  const box = dom.shots;
+  if (!box) return;
+  box.innerHTML = '';
+  const shots = state.pendingShots;
+  const busy = state.shotBusy > 0;
+  box.hidden = !shots.length && !busy;
+  for (const s of shots) {
+    const cell = el('div', { class: 'composer__shot' });
+    const img = el('img', { src: s.url, alt: s.name || '图片' });
+    cell.append(img);
+    cell.append(el('button', {
+      class: 'composer__shot-x', type: 'button', title: '移除这张图', text: '✕',
+      onclick: () => {
+        state.pendingShots = state.pendingShots.filter((x) => x !== s);
+        renderShots();
+      },
+    }));
+    box.append(cell);
+  }
+  if (busy) {
+    const cell = el('div', { class: 'composer__shot composer__shot--busy' });
+    cell.append(el('span', { class: 'spinner' }));
+    cell.append(el('span', { class: 'composer__shot-note', text: '处理中' }));
+    box.append(cell);
+  }
+}
+
+async function addFiles(files) {
+  const list = Array.from(files || []).filter((f) => /^image\//.test(f.type || ''));
+  if (!list.length) { toast('只能发图片（JPG / PNG / WebP / GIF）', 'err'); return; }
+  const room = MAX_SHOTS - state.pendingShots.length;
+  if (room <= 0) { toast('一条消息最多 ' + MAX_SHOTS + ' 张图', 'err'); return; }
+  const take = list.slice(0, room);
+  if (list.length > room) toast('只收了前 ' + room + ' 张（上限 ' + MAX_SHOTS + '）', '');
+  if (state.pendingShots.length + take.length > 6 && !state.manyShotHinted) {
+    state.manyShotHinted = true;
+    toast('图片有点多，先生可能一次看不过来这里所有细节，必要时分两条发。', '');
+  }
+  for (const file of take) {
+    state.shotBusy++;
+    renderShots();
+    try {
+      state.pendingShots.push(await prepareShot(file));
+    } catch (e) {
+      toast('这张图没加上：' + (e && e.message ? e.message : e), 'err');
+    } finally {
+      state.shotBusy--;
+      renderShots();
+    }
   }
 }
 
@@ -604,6 +737,9 @@ export function initStudy(opts = {}) {
     messages: $('#messages'),
     input: $('#composer-input'),
     send: $('#btn-send'),
+    attach: $('#btn-attach'),
+    file: $('#file-input'),
+    shots: $('#composer-shots'),
     main: $('#study-main'),
     jump: $('#jump-bottom'),
   };
@@ -620,15 +756,60 @@ export function initStudy(opts = {}) {
   dom.send.addEventListener('click', () => {
     if (state.streaming) { stopStreaming(); return; }
     const v = dom.input.value;
+    // 旧写法是「先清空输入框再 send」，而 send 在流式/图片处理中会直接 return，
+    // 于是你刚打的字凭空消失。现在先确认能发，再清空。
+    if (!v.trim() && !state.pendingShots.length) { dom.input.focus(); return; }
+    if (state.shotBusy) { toast('图片还在处理，等一下', ''); return; }
     dom.input.value = '';
     dom.input.style.height = 'auto';
     send(v);
   });
 
+  // 发图片：按钮 / 粘贴 / 拖进来，三条路都收
+  if (dom.attach && dom.file) {
+    dom.attach.addEventListener('click', () => dom.file.click());
+    dom.file.addEventListener('change', () => {
+      addFiles(dom.file.files);
+      dom.file.value = '';
+    });
+  }
+  dom.input.addEventListener('paste', (e) => {
+    const files = (e.clipboardData && e.clipboardData.files) || [];
+    const imgs = Array.from(files).filter((f) => /^image\//.test(f.type || ''));
+    if (imgs.length) { e.preventDefault(); addFiles(imgs); }
+  });
+  const hasImage = (e) => {
+    const dt = e.dataTransfer;
+    if (!dt) return false;
+    if (dt.types && Array.from(dt.types).indexOf('Files') >= 0) return true;
+    return Array.from(dt.items || []).some((it) => it.kind === 'file');
+  };
+  if (dom.main) {
+    dom.main.addEventListener('dragover', (e) => {
+      if (!hasImage(e)) return;
+      e.preventDefault();
+      dom.main.classList.add('is-dragover');
+    });
+    dom.main.addEventListener('dragleave', (e) => {
+      if (e.relatedTarget && dom.main.contains(e.relatedTarget)) return;
+      dom.main.classList.remove('is-dragover');
+    });
+    dom.main.addEventListener('drop', (e) => {
+      if (!hasImage(e)) return;
+      e.preventDefault();
+      dom.main.classList.remove('is-dragover');
+      addFiles(e.dataTransfer && e.dataTransfer.files);
+    });
+  }
+  renderShots();
+
   dom.input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
+      if (state.streaming) { toast('先生还在讲，先等等', ''); return; }
       const v = dom.input.value;
+      if (!v.trim() && !state.pendingShots.length) return;
+      if (state.shotBusy) { toast('图片还在处理，等一下', ''); return; }
       dom.input.value = '';
       autoGrow();
       send(v);
@@ -636,13 +817,46 @@ export function initStudy(opts = {}) {
   });
   dom.input.addEventListener('input', autoGrow);
 
-  /* 磨砂聚焦：输入框聚焦时把左右面板压下去 */
+  /* 磨砂聚焦：把左右面板压下去，注意力落在纸面上
+     规则（用户定的）：
+       左键点对话区（含输入框、消息、快捷条）→ 进入
+       左键点左右侧栏 → 取消
+       右键任意位置 → 取消
+       其它（顶栏按钮、角落图标、弹窗）→ 不改
+     以前是「输入框失焦就取消」，等于点屏幕任意位置都会取消，太容易被误触。 */
   const setFocusMode = (on) => {
     if ((store.state.prefs && store.state.prefs.focusMode) === false) return;
     document.body.classList.toggle('chat-focus', !!on);
   };
+  const focusState = () => document.body.classList.contains('chat-focus');
+
   dom.input.addEventListener('focus', () => setFocusMode(true));
-  dom.input.addEventListener('blur', () => { if (!state.streaming) setFocusMode(false); });
+
+  document.addEventListener('pointerdown', (e) => {
+    if (e.button === 2) return;              // 右键交给下面的 contextmenu
+    const t = e.target;
+    if (!t || typeof t.closest !== 'function') return;
+    if (t.closest('.pane--left, .pane--right')) setFocusMode(false);
+    else if (t.closest('.chat-pane')) setFocusMode(true);
+  }, true);
+
+  document.addEventListener('contextmenu', () => {
+    if (focusState()) setFocusMode(false);
+  }, true);
+
+  // 隔离罩：盖在左右侧栏上，接住第一次点击（只退出聚焦，不穿透到章节链接）
+  for (const pane of [document.querySelector('.pane--left'), document.querySelector('.pane--right')]) {
+    if (!pane) continue;
+    // 罩子上不放任何文字：它的作用是"让注意力回到对话"，写一句提示反而把人拽回来
+    const veil = el('div', { class: 'pane-veil', 'aria-hidden': 'true' });
+    veil.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setFocusMode(false);
+    });
+    pane.append(veil);
+  }
+
   studySetFocusMode = setFocusMode;
 
   function autoGrow() {
@@ -706,3 +920,14 @@ export async function openSection(sectionId, { silent = false } = {}) {
 export function currentSection() { return state.sectionId; }
 export function collectFromMessage(msg) { onCollect(msg); }
 export function sendToTeacher(text) { return send(text); }
+
+/** 把一张已经处理好的图片放进待发送区（测试和「从别处带入图片」都用它） */
+export function addShot(shot) {
+  if (!shot || !shot.url) return false;
+  if (state.pendingShots.length >= MAX_SHOTS) { toast('一条消息最多 ' + MAX_SHOTS + ' 张图', 'err'); return false; }
+  state.pendingShots.push(shot);
+  renderShots();
+  return true;
+}
+
+export function pendingShotCount() { return state.pendingShots.length; }

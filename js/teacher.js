@@ -17,7 +17,11 @@ const SYNTAX_DOC = [
   '   例：$a^2+b^2=c^2$　；　$$\\int_0^1 x^2\\,\\mathrm{d}x=\\frac13$$',
   '2. 生物/化学名称中的化学式、反应式用 mhchem：$$\\ce{6CO2 + 6H2O ->[光照] C6H12O6 + 6O2}$$',
   '3. 需要展示函数图像时，用 plot 代码块（语法见下），不要用文字描述图像形状代替。',
-  '4. 需要几何图形、受力图、示意图、流程图时，用 svg 代码块输出完整 SVG。',
+  '4. **默认不要画图。** 讲题、讲概念一律用文字 + 公式 + 表格说清楚；只有学生明确要求',
+  '   「画个图 / 画出来 / 看图 / 画个立体图」时，才在答案后面附图，一节课最多一张。',
+  '   确实要画时：几何图形、受力图、示意图、流程图用 svg 代码块（输出完整 SVG）；',
+  '   立体几何（棱锥/棱柱/正方体/四面体）用 geo3d 代码块，**禁止手画 svg 画立体图**（svg 只认屏幕坐标，判不出哪条棱被挡）。',
+  '   学生明确说不能联网时不要给 ggb；只有学生要求「能转着看」时才附 ggb。',
   '5. 需要梳理时间线时用 timeline 代码块；需要梳理知识结构时用 mindmap 代码块。',
   '6. 对比、分类信息优先用 Markdown 表格。',
   '7. 严禁使用 ASCII 字符画图（如用 - | / \\ 拼图形）。',
@@ -43,6 +47,40 @@ const SYNTAX_DOC = [
   '- 描边颜色用 #2b2318，强调色用 #b0453a，辅助线用 #2f5c8a 并加 stroke-dasharray="5 4"。',
   '- 文字用 font-family="KaiTi,SimSun,serif" font-size="13"，标注点用 <text> 配合 dominant-baseline。',
   '- 不要画白色背景矩形，不要用 <script>、<style>、外部图片。',
+  '',
+  '【ggb 代码块语法｜立体几何首选】',
+  '一行一条 GeoGebra 命令，坐标**按题目给的数值**写（别凭感觉摆）；先给点，再给面/体：',
+  fmtFence('ggb', [
+    'A=(0,0,0)',
+    'B=(1,0,0)',
+    'C=(1,1,0)',
+    'D=(0,0.5,0)',
+    'S=(0,0,1)',
+    'q=Polygon(A,B,C,D)',
+    'p=Pyramid(S,q)',
+  ].join('\n')),
+  '规则：',
+  '1. 只用这几类命令：Polygon(点…) 多边形、Pyramid(顶点,多边形) 棱锥、Prism(多边形,高度) 棱柱、',
+  '   Segment(点,点) 线段（用来强调某条棱）。',
+  '2. **禁止**写 Angle / 直角标记 / SetColor / SetLineThickness / SetPointSize / ShowLabel / ShowAxes /',
+  '   ShowGrid / ZoomIn / SetViewDirection 这类样式与视角命令 —— 线宽、点的大小、标签、坐标轴、取景全部由页面统一处理。',
+  '   也不要自己算并标出角度：标注错了比不标更糟（实测标过一个与题目无关的 113.43°）。',
+  '3. 一个图 4~8 个点最合适；命令总数控制在 12 条以内。',
+  '4. ggb 是「附赠的旋转图」，同一个图必须先用 geo3d 给出静态图，不要只给 ggb。',
+  '',
+  '【geo3d 代码块语法｜默认出图，练习册那种静态图】',
+  '它画出来就是练习册风格：墨色细线、被挡的棱是虚线、顶点是小圆点 + 字母、没有坐标轴和网格。',
+  '为什么不用 svg 画立体图：svg 只认屏幕坐标，你没法判断哪条棱该虚；geo3d 只要三维坐标，',
+  '投影、遮挡（虚实线）、直角标记、标注避让全部由程序算，几何关系由坐标保证。',
+  '每行一条；x 向右、y 朝观察者（画成右下）、z 向上，单位随意（会自动缩放）：',
+  fmtFence('geo3d', ['A: 0,0,0', 'B: 1,0,0', 'C: 1,1,0', 'D: 0,0.5,0', 'S: 0,0,1', '面: ABCD, SAB, SBC, SCD, SAD', '直角: S,A,B'].join('\n')),
+  '规则：',
+  '1. **按题目给的数值写坐标**（SA=BC=1、AD=BC/2 就直接写 AD=0.5），不要凭感觉摆点。',
+  '2. 面的顶点按环绕顺序写，程序会自动把法线朝外；顺序写反也不影响。',
+  '3. 只有程序判断和你预期不符时，才用 `虚线: A-B` 强制某条棱虚。',
+  '4. 直角关系用 `直角: S,A,B`（在 A 处画标记）；题目要证的垂直关系尽量标出来。',
+  '5. 一个图 4~8 个点最合适；不要画坐标轴、网格、多余辅助线。',
+  '6. 可选关键字：`淡面:` 给正面加很淡的颜色（一般不用）；`正视图:` 让纵深压得更扁（想更接近课本重影时用）。',
   '',
   '【timeline 代码块语法】每行：时间 | 事件 | 补充说明（后两项可省略）',
   '',
@@ -148,6 +186,17 @@ function buildProfile(sectionId) {
   return lines.join('\n');
 }
 
+
+const IMAGE_RULES = [
+  '【学生发了图片时】',
+  '0. 如果你这边其实读不到图片内容（只收到一个占位符、或看不清字），就直接说「我这边看不到图里的字」，请学生重发或改用文字描述题目；**绝对不要凭猜测编一道题出来**。',
+  '1. 先用引用块（>）逐字抄出图片里真正印着/写着的题干（含条件、数据、单位、选项），这是后面讲解的依据，不要凭印象补全。',
+  '2. 抄完判断清晰度：模糊、缺页、关键条件被裁掉时，直接说明「第几张图哪里看不清」，请学生重拍或补拍，不要硬猜。',
+  '3. 若图片是学生的解答或草稿：先指出写对的部分和第一个出错的位置，再给正确写法，不要重头讲一遍。',
+  '4. 图片与当前章节无关（比如别的科目）时照常讲，但用一句话说明它属于哪一科哪一块。',
+  '5. 不要把图片内容描述一遍就算讲完；讲题仍按你一贯的方式（思路 → 步骤 → 易错点）。',
+].join('\n');
+
 /** 首次进入某节时的开场指令（作为隐藏的用户消息发给模型） */
 export function openingInstruction(sectionId) {
   const w = getSectionWrap(sectionId);
@@ -165,8 +214,10 @@ export function openingInstruction(sectionId) {
   ].join('\n');
 }
 
-export function buildMessages(sectionId, history, userText, extraSystem) {
-  const sys = [PERSONA, SYNTAX_DOC, buildProfile(sectionId), extraSystem || ''].filter(Boolean).join('\n\n');
+export function buildMessages(sectionId, history, userText, extraSystem, images) {
+  const hasImages = Array.isArray(images) && images.length > 0;
+  const sys = [PERSONA, SYNTAX_DOC, hasImages ? IMAGE_RULES : '', buildProfile(sectionId), extraSystem || '']
+    .filter(Boolean).join('\n\n');
   const msgs = [{ role: 'system', content: sys }];
 
   const turns = (history || []).filter((m) => m.role === 'user' || m.role === 'assistant');
@@ -178,18 +229,33 @@ export function buildMessages(sectionId, history, userText, extraSystem) {
     const len = String(m.content || '').length;
     if (budget - len < 0 && kept.length >= 6) break;
     budget -= len;
-    kept.unshift({ role: m.role, content: String(m.content || '') });
+    // 历史里的图片只留一句标记：每条都带 base64，上下文会瞬间爆掉
+    const shotCount = Array.isArray(m.images) ? m.images.length : 0;
+    const text = String(m.content || '') + (shotCount ? '\n（此前附了 ' + shotCount + ' 张图片）' : '');
+    kept.unshift({ role: m.role, content: text });
   }
   msgs.push(...kept);
 
-  if (userText != null) msgs.push({ role: 'user', content: String(userText) });
+  if (hasImages) {
+    // 有图：把「最后一条用户消息」改写成 OpenAI 兼容的多模态数组（文字 + image_url）。
+    // 注意不能新 push 一条 —— 那条文字已经在 history 里了，再 push 会重复一遍。
+    const parts = [];
+    const last = msgs[msgs.length - 1];
+    const lastText = last && last.role === 'user' ? String(last.content || '') : '';
+    parts.push({ type: 'text', text: lastText.trim() || '（学生只发了图片，没有打字。请按图片规则处理。）' });
+    for (const src of images) parts.push({ type: 'image_url', image_url: { url: src } });
+    if (last && last.role === 'user') msgs[msgs.length - 1] = { role: 'user', content: parts };
+    else msgs.push({ role: 'user', content: parts });
+  } else if (userText != null) {
+    msgs.push({ role: 'user', content: String(userText) });
+  }
   return msgs;
 }
 
 /** 主对话入口 */
-export async function askTeacher({ sectionId, history, text, onDelta, onThink, signal, extraSystem, temperature }) {
-  const messages = buildMessages(sectionId, history, text, extraSystem);
-  return api.chat({ messages, onDelta, onThink, signal, temperature });
+export async function askTeacher({ sectionId, history, text, images, onDelta, onThink, signal, extraSystem, temperature, model }) {
+  const messages = buildMessages(sectionId, history, text, extraSystem, images);
+  return api.chat({ messages, model, onDelta, onThink, signal, temperature });
 }
 
 /** 通用一次性调用（错题本变式题 / 批改 / 备忘录整理等） */

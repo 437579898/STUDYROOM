@@ -14,6 +14,7 @@ import { initWrongbook, collectFromMessage, refreshWrongbook, toggleWrongbook, c
 import { initMemo, toggleMemo, closeMemo, refreshMemo } from './memo.js';
 import { initSettings, applyFxMode } from './settings.js';
 import { initSearch, closeSearch, toggleSearch } from './search.js';
+import { initAssistant, toggleAssistant, closeAssistant } from './assistant.js';
 
 let currentView = 'desk';
 const CODE_KEY = 'study-room.access-code';
@@ -211,6 +212,10 @@ async function boot() {
     },
   });
 
+  initAssistant({
+    onPickSection: (id) => enterSection(id),
+  });
+
   initStudy({
     onEnterSection: (id) => enterSection(id),
     onCollect: (msg) => collectFromMessage(msg, currentSectionId()),
@@ -254,6 +259,7 @@ async function boot() {
       closeSearch();
       closeWrongbook();
       closeMemo();
+      closeAssistant();
     }
     // Ctrl/Cmd + F 打开搜索
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
@@ -282,6 +288,13 @@ async function boot() {
       import('./math.js').then((m) => m.hydratePlots(document)).catch(() => {});
     }, 320);
   });
+
+  // 直接用链接打开复习助手：?asst=1（方便给自己收藏一个「回顾」入口）
+  try {
+    if (new URLSearchParams(location.search).get('asst') === '1') {
+      setTimeout(() => { try { toggleAssistant(true); } catch { /* ignore */ } }, 350);
+    }
+  } catch { /* ignore */ }
 
   if (isStandalone()) {
     document.title = '高中学习书房 · ' + modeLabel();

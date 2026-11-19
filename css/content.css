@@ -138,6 +138,23 @@
     transparent 95%);
 }
 
+/* ==$$…$$== 这种"整条独立公式"的强调：mark 要走块级排版。
+   inline 的 mark 包住块级的 .katex-display，行盒高度会塌成 0，
+   背景只剩左右两道细边（真实截图踩过）。块级模式改成一条横幅，
+   底色也调淡一档：整块面积大，30% 会读成色块。 */
+.md mark.fx.fx--block {
+  display: block;
+  margin: .55em 0;
+  padding: .34em .6em;
+  border-radius: 8px;
+  background-image: linear-gradient(178deg,
+    transparent 2%,
+    rgba(176, 116, 127, .20) 10%,
+    rgba(176, 116, 127, .16) 82%,
+    transparent 98%);
+}
+.md mark.fx.fx--block .katex-display { margin: 0; }
+
 /* 兜底开关：设置里关掉「公式强调」时整站不再涂抹，连 == 的痕迹也不留 */
 body.no-fx .md mark.fx {
   background-image: none;
@@ -175,6 +192,21 @@ body.no-fx .md mark.fx {
   color: var(--ink-3);
   line-height: 1.7;
 }
+
+/* GeoGebra 图块：默认只是一个按钮，点了才注入 applet */
+.ggb { display: block; }
+.ggb__stage:empty { display: none; }
+.ggb__stage { margin-bottom: 10px; border-radius: 9px; overflow: hidden; }
+/* 加载中先占位，避免 applet 起来时整条消息往下跳 */
+.ggb__stage--loading {
+  min-height: 220px;
+  background: repeating-linear-gradient(-45deg, rgba(160, 140, 105, .07) 0 12px, transparent 12px 24px);
+}
+.ggb__host { width: 100%; min-height: 220px; }
+.ggb__host iframe, .ggb__host canvas, .ggb__host > div { max-width: 100%; }
+.ggb__bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ggb__note { font-size: 11.5px; color: var(--ink-4); font-family: var(--font-mono); }
+.ggb__note--bad { color: #7d2e21; }
 
 /* 画布上的图例 */
 .plot-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 4px 4px 2px; }

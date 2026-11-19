@@ -370,6 +370,15 @@
 }
 .msg:hover .msg__actions { opacity: 1; }
 .msg__actions .btn { padding: 3px 9px; font-size: 11.5px; box-shadow: none; background: rgba(255, 253, 246, .7); }
+/* 操作条里的「重来一次」：它需要比普通小按钮更显眼。
+   注意别用 .btn--primary —— .btn--primary 的文字是浅色，而 .msg__actions .btn 把背景刷成了浅底，
+   两者叠起来就是白底白字（按钮上没字）。这里单独给 .btn--retry 一套深底浅字。 */
+.msg__actions .btn--retry {
+  background: linear-gradient(180deg, #8a5a2b, #6d4520);
+  border-color: #5b3818;
+  color: #fdf3dd;
+}
+.msg__actions .btn--retry:hover { background: linear-gradient(180deg, #9a6733, #7a4e26); border-color: #7a4e26; }
 
 /* 折叠的「思考过程」——默认收起，不干扰正文 */
 .msg__think {
@@ -409,6 +418,19 @@
   font-family: var(--font-mono);
 }
 
+/* 「这次没写完」的提示条：用错误色系但不用整块红底，避免和真正的报错混淆 */
+.msg__cut {
+  margin-top: 9px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: #7d2e21;
+  background: rgba(168, 64, 47, .07);
+  border: 1px solid rgba(168, 64, 47, .22);
+}
+.msg__cut::before { content: "⚠ "; }
+
 /* 流式等待 */
 .msg__waiting { display: flex; align-items: center; gap: 9px; color: var(--ink-3); font-size: 13px; }
 
@@ -416,12 +438,31 @@
    和先生对话时（输入框聚焦、或正在流式输出）把左右面板压下去，注意力落在纸面上。
    注意：模糊是静态的（只在切换瞬间栅格化一次），过渡只走 opacity，
    避免在滚动/流式期间产生持续重绘。 */
-body.chat-focus .pane--left,
-body.chat-focus .pane--right {
-  filter: blur(1.8px) saturate(.55) brightness(.8);
-  opacity: .42;
+/* 以前是 filter: blur() + opacity —— 纸上有一层 1px 的纤维斜纹（repeating-linear-gradient 38deg / -26deg），
+   一模糊就被抹成一道道淡淡的斜杠；而且面板还在响应点击，点"取消"会点到背后的章节链接。
+   现在换成「毛玻璃隔离罩」：半透明纸色 + backdrop-filter 糊开，结构隐约可见，
+   罩子自己接住点击（只退出聚焦，不穿透），底下的内容 pointer-events 关掉，彻底点不到。 */
+.pane--left, .pane--right { position: relative; }
+.pane-veil {
+  position: absolute; inset: 0; z-index: 6;
+  /* 半透明毛玻璃：侧栏本身是深色玻璃，罩子就用同一材质的"雾"——
+     不用高光、不加内阴影，结构（金色章节名）糊成隐约的光斑。 */
+  background: rgba(20, 14, 9, .26);
+  -webkit-backdrop-filter: blur(5px) saturate(.85);
+  backdrop-filter: blur(5px) saturate(.85);
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s ease;
+  cursor: default;
 }
-.pane--left, .pane--right { transition: opacity .28s ease, filter .28s ease; }
+/* 不支持 backdrop-filter 的浏览器：退成不透明纸色，至少还能挡住点击 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .pane-veil { background: rgba(247, 241, 227, .9); }
+}
+body.chat-focus .pane-veil { opacity: 1; pointer-events: auto; }
+body.chat-focus .pane--left .pane__body,
+body.chat-focus .pane--right .pane__body,
+body.chat-focus .pane--left .pane__head,
+body.chat-focus .pane--right .pane__head { pointer-events: none; }
 
 /* 对话分页按钮 */
 .load-earlier {
@@ -678,4 +719,86 @@ body.fluid .pane--right { display: none; }
   body.fluid .study-main { grid-template-columns: 0 minmax(0,1fr) 0; padding: 8px; }
   body.fluid .pane--left { display: none; }
   body.fluid .study-topbar { padding-left: 14px; padding-right: 14px; }
+}
+
+
+/* ===========================================================
+   对话识图：输入框附件条 / 消息缩略图 / 灯箱 / 拖拽落点
+   =========================================================== */
+
+.composer__attach {
+  flex: none; width: 34px; height: 34px; margin: 0 6px 0 2px;
+  display: grid; place-items: center; align-self: flex-end;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: rgba(255, 253, 247, .7); color: var(--ink-3);
+  font-family: var(--font-sans); font-size: 18px; line-height: 1;
+  cursor: pointer; transition: color .2s ease, border-color .2s ease, background .2s ease;
+}
+.composer__attach:hover { color: var(--ink); border-color: var(--gold-deep); background: rgba(255, 253, 247, .95); }
+.composer__attach:disabled { opacity: .4; cursor: not-allowed; }
+
+.composer__shots {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 2px 2px 8px;
+}
+.composer__shot {
+  position: relative; width: 62px; height: 62px; flex: none;
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+  background: #fff;
+}
+.composer__shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.composer__shot-x {
+  position: absolute; top: 2px; right: 2px; width: 18px; height: 18px;
+  display: grid; place-items: center; padding: 0;
+  border: none; border-radius: 50%;
+  background: rgba(30, 22, 14, .72); color: #fdf3dd;
+  font-size: 10px; line-height: 1; cursor: pointer;
+}
+.composer__shot-x:hover { background: var(--danger); }
+.composer__shot--busy {
+  display: grid; place-items: center; gap: 2px;
+  background: rgba(255, 253, 247, .8); color: var(--ink-4);
+}
+.composer__shot-note { font-family: var(--font-mono); font-size: 9px; letter-spacing: .04em; }
+
+/* 消息里的缩略图 */
+.msg__shots { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.msg__shot {
+  padding: 0; width: 132px; height: 132px; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: #fff; cursor: zoom-in;
+}
+.msg__shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.msg__shot:hover { border-color: var(--gold-deep); }
+.msg--user .msg__shot { width: 118px; height: 118px; }
+
+/* 灯箱 */
+.shot-viewer {
+  position: fixed; inset: 0; z-index: 900;
+  display: grid; place-items: center;
+  background: rgba(18, 14, 10, .92);
+  opacity: 0; pointer-events: none; transition: opacity .16s ease;
+  cursor: zoom-out;
+}
+.shot-viewer.is-open { opacity: 1; pointer-events: auto; }
+.shot-viewer img {
+  max-width: 92vw; max-height: 86vh;
+  border-radius: 6px; box-shadow: 0 24px 70px rgba(0, 0, 0, .6);
+  background: #fff;
+}
+.shot-viewer__hint {
+  position: absolute; bottom: 18px; left: 0; right: 0; text-align: center;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .1em;
+  color: rgba(253, 243, 221, .6);
+}
+
+/* 拖拽：整块对话区变成落点 */
+.chat-pane.is-dragover::after {
+  content: '松手，把图片加进这条消息';
+  position: absolute; inset: 10px; z-index: 20;
+  display: grid; place-items: center;
+  border: 2px dashed var(--gold-deep); border-radius: 10px;
+  background: rgba(247, 241, 227, .82);
+  font-family: var(--font-serif); font-size: 15px; letter-spacing: .08em; color: var(--ink-2);
+  pointer-events: none;
 }

@@ -48,6 +48,8 @@ function paint(config, notice) {
   cfg = config;
   dom.baseUrl.value = config.baseUrl || '';
   dom.model.value = config.model || '';
+  // 旧版服务端不回传 visionModel：这时别把用户刚填的字段清空
+  if (dom.vision && typeof config.visionModel === 'string') dom.vision.value = config.visionModel;
   dom.key.value = '';
   dom.key.placeholder = config.hasKey ? ('已保存：' + config.keyHint + '（留空表示不修改）') : 'sk-...';
   dom.temp.value = String(config.temperature != null ? config.temperature : 0.6);
@@ -122,6 +124,7 @@ export function initSettings() {
   dom = {
     baseUrl: $('#cfg-baseurl'),
     model: $('#cfg-model'),
+    vision: $('#cfg-vision'),
     key: $('#cfg-key'),
     temp: $('#cfg-temp'),
     keyState: $('#cfg-keystate'),
@@ -213,6 +216,7 @@ export function initSettings() {
       const patch = {
         baseUrl: dom.baseUrl.value.trim(),
         model: dom.model.value.trim(),
+        visionModel: dom.vision ? dom.vision.value.trim() : '',
         temperature: Number(dom.temp.value) || 0.6,
       };
       if (dom.key.value.trim()) patch.apiKey = dom.key.value.trim();
@@ -228,7 +232,12 @@ export function initSettings() {
         try { localStorage.setItem(CODE_KEY, newCode); } catch { /* ignore */ }
       }
 
-      paint(res.config, (res.notices || []).join('　'));
+      const notes = (res.notices || []).slice();
+      // 老版本 server.js 还没有 visionModel 字段：写进去会被丢掉，直接告诉他重启
+      if (patch.visionModel && res.config && res.config.visionModel !== patch.visionModel) {
+        notes.push('识图模型没保存住：服务端还是旧版本，请关掉 node server.js 重新启动一次。');
+      }
+      paint(res.config, notes.join('　'));
       toast('配置已保存', 'ok');
       setTimeout(() => closeModal('modal-settings'), 900);
     } catch (err) {
@@ -250,6 +259,7 @@ export function initSettings() {
       const patch = {
         baseUrl: dom.baseUrl.value.trim(),
         model: dom.model.value.trim(),
+        visionModel: dom.vision ? dom.vision.value.trim() : '',
         temperature: Number(dom.temp.value) || 0.6,
       };
       if (dom.key.value.trim()) {

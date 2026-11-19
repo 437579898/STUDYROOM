@@ -332,3 +332,126 @@
 }
 .mode-line[data-mode="server"] .pill { color: #2f5c3c; border-color: rgba(63, 122, 79, .45); background: rgba(63, 122, 79, .09); }
 .mode-line[data-mode="standalone"] .pill { color: #34507c; border-color: rgba(63, 95, 146, .45); background: rgba(63, 95, 146, .09); }
+
+/* ===========================================================
+   复习助手（modal--asst）
+   和错题本/备忘录不同，它是一个"能翻全部记录"的对话窗口，
+   所以版式是：头部说明 + 可滚动记录列表 + 一行输入 + 一行脚注。
+   =========================================================== */
+
+.asst-glyph { font-size: 17px; line-height: 1; color: var(--gold-deep); }
+
+body:not(.fluid) .modal.modal--asst { width: 720px; height: 620px; max-height: 620px; }
+.modal--asst { width: 720px; max-height: 620px; }
+
+.asst-head-note {
+  margin-left: 10px; font-family: var(--font-mono); font-size: 11.5px;
+  letter-spacing: .04em; color: var(--ink-3);
+}
+
+.asst-body {
+  /* .modal__body 默认按内容高度撑开，这里必须 flex:1 才会填满 620 的弹窗，
+     否则输入框会紧贴在记录卡下面、弹窗下半截空着。 */
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 18px 12px; overflow: hidden;
+}
+
+.asst-list {
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column; gap: 12px;
+  padding-right: 4px; scrollbar-gutter: stable;
+}
+
+/* ---------- 空状态：档案卡 ---------- */
+.asst-card {
+  border: 1px solid var(--line); border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(240,232,214,.5));
+  padding: 14px 16px 12px;
+}
+.asst-card__title {
+  font-family: var(--font-serif); font-size: 15px; letter-spacing: .08em;
+  color: var(--ink-2); margin-bottom: 10px;
+}
+.asst-card__row {
+  display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--ink-3); margin-bottom: 6px;
+}
+.asst-card__row b { font-family: var(--font-mono); font-size: 16px; color: var(--ink); }
+.asst-card__row i { font-style: normal; color: var(--ink-4); margin: 0 4px; }
+.asst-card__hint {
+  font-size: 12px; color: var(--ink-3); margin: 8px 0 12px;
+  padding-top: 8px; border-top: 1px dashed var(--line-soft);
+}
+.asst-quick { display: flex; flex-wrap: wrap; gap: 7px; }
+
+/* ---------- 气泡 ---------- */
+.asst-msg { display: flex; flex-direction: column; gap: 4px; max-width: 100%; }
+.asst-msg--me { align-items: flex-end; }
+.asst-msg__who {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em;
+  color: var(--ink-4); padding: 0 2px;
+}
+.asst-msg__bubble {
+  max-width: 88%; padding: 10px 13px; border-radius: 10px;
+  font-family: var(--font-sans); font-size: 13.5px; line-height: 1.85; color: var(--ink);
+  border: 1px solid var(--line-soft);
+}
+.asst-msg--me .asst-msg__bubble {
+  background: rgba(168,148,100,.14); border-color: rgba(168,148,100,.34);
+  max-width: 80%;
+}
+.asst-msg--ai .asst-msg__bubble {
+  background: rgba(255,255,255,.62);
+  box-shadow: 0 1px 0 rgba(255,255,255,.7) inset;
+}
+.asst-msg--ai .asst-msg__bubble :is(p, ul, ol, blockquote):first-child { margin-top: 0; }
+.asst-msg--ai .asst-msg__bubble :is(p, ul, ol, blockquote):last-child { margin-bottom: 0; }
+.asst-waiting {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--ink-3);
+}
+
+/* ---------- 出处 ---------- */
+.asst-cites {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 2px 2px 0; max-width: 92%;
+}
+.asst-cites__label {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em; color: var(--ink-4);
+}
+.asst-cite {
+  appearance: none; cursor: pointer;
+  padding: 3px 9px; border-radius: 999px;
+  border: 1px solid rgba(168,148,100,.42); background: rgba(232,207,140,.14);
+  color: var(--ink-2); font-family: var(--font-sans); font-size: 11.5px;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.asst-cite:hover { background: rgba(232,207,140,.3); border-color: var(--gold-deep); }
+
+/* ---------- 输入 ---------- */
+.asst-composer { display: flex; gap: 8px; align-items: flex-end; }
+.asst-composer .composer__input {
+  flex: 1; min-height: 44px; max-height: 112px; resize: none;
+  padding: 11px 13px; border-radius: 9px;
+  border: 1px solid var(--line);
+  background: rgba(255, 253, 247, .92);
+  box-shadow: inset 0 1px 2px rgba(90, 70, 40, .07);
+  font-family: var(--font-sans); font-size: 13.5px; line-height: 1.65;
+  color: var(--ink);
+}
+.asst-composer .composer__input:focus {
+  outline: none; border-color: var(--gold-deep);
+  box-shadow: inset 0 1px 2px rgba(90, 70, 40, .07), 0 0 0 3px rgba(168, 148, 100, .16);
+}
+.asst-composer .composer__input::placeholder { color: var(--ink-4); }
+.asst-composer .composer__send {
+  width: 44px; height: 44px; flex: none; border-radius: 9px;
+  display: grid; place-items: center;
+}
+.asst-composer .composer__send.is-busy { opacity: .45; pointer-events: none; }
+
+.asst-foot {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .04em;
+  color: var(--ink-4); text-align: right;
+}
