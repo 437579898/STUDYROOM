@@ -15,6 +15,7 @@ import { initMemo, toggleMemo, closeMemo, refreshMemo } from './memo.js';
 import { initSettings, applyFxMode } from './settings.js';
 import { initSearch, closeSearch, toggleSearch } from './search.js';
 import { initAssistant, toggleAssistant, closeAssistant } from './assistant.js';
+import { initEnglish, openEnglish, closeEnglish } from './english.js';
 
 let currentView = 'desk';
 const CODE_KEY = 'study-room.access-code';
@@ -77,11 +78,16 @@ function showView(name) {
   const to = document.getElementById('view-' + name);
   if (from) {
     from.classList.add('is-leaving');
-    setTimeout(() => { from.classList.remove('is-active', 'is-leaving'); }, 380);
+    // 380ms 后收尾；若这期间该视图又被激活（is-leaving 被清掉），这段就是空操作
+    setTimeout(() => {
+      if (!from.classList.contains('is-leaving')) return;
+      from.classList.remove('is-leaving', 'is-active');
+    }, 380);
   }
-  if (to) to.classList.add('is-active');
+  if (to) { to.classList.remove('is-leaving'); to.classList.add('is-active'); }
   currentView = name;
   document.body.classList.toggle('in-study', name === 'study');
+  document.body.classList.toggle('in-english', name === 'english');
   if (typeof applyStage === 'function') applyStage();
 }
 
@@ -202,6 +208,15 @@ async function boot() {
 
   initBook({
     onPickSection: (id) => enterSection(id),
+    onOpenEnglish: () => { showView('english'); openEnglish(''); },
+  });
+
+  initEnglish({
+    onExit: () => {
+      closeEnglish();
+      showView('desk');
+      try { refreshBook(); } catch { /* ignore */ }
+    },
   });
 
   initSearch({
@@ -288,6 +303,16 @@ async function boot() {
       import('./math.js').then((m) => m.hydratePlots(document)).catch(() => {});
     }, 320);
   });
+
+  // 英语板块直开：?en=vocab / write / vault / issues / review
+  try {
+    const en = new URLSearchParams(location.search).get('en');
+    if (en) {
+      setTimeout(() => {
+        try { showView('english'); openEnglish(en === '1' ? '' : en); } catch { /* ignore */ }
+      }, 320);
+    }
+  } catch { /* ignore */ }
 
   // 直接用链接打开复习助手：?asst=1（方便给自己收藏一个「回顾」入口）
   try {

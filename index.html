@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>高中学习书房 · 数学 / 物理 / 生物</title>
+<title>高中学习书房 · 数学 / 物理 / 生物 / 英语</title>
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/book.css">
 <link rel="stylesheet" href="css/study.css">
+<link rel="stylesheet" href="css/english.css">
 <link rel="stylesheet" href="css/content.css">
 <link rel="stylesheet" href="css/panels.css">
 <link rel="stylesheet" href="css/layout.css">
@@ -17,10 +18,11 @@
      放在 </body> 前的话，要等整个 body 解析完才开始下载。 -->
 <script defer src="data/curriculum.js"></script>
 <script defer src="data/concepts.js"></script>
+<script defer src="data/english.js"></script>
 <script defer src="vendor/katex/katex.min.js"></script>
 <script defer src="vendor/katex/contrib/mhchem.min.js"></script>
 <script defer src="vendor/marked.min.js"></script>
-<script defer src="js/app.js?v=1.9.0" type="module"></script>
+<script defer src="js/app.js?v=1.10.0" type="module"></script>
 </head>
 <body>
 
@@ -82,7 +84,7 @@
         <div class="cover__frame">
           <h1 class="cover__title">高中学习书房</h1>
           <div class="cover__rule"></div>
-          <p class="cover__sub">数 学 · 物 理 · 生 物</p>
+          <p class="cover__sub">数 学 · 物 理 · 生 物 · 英 语</p>
           <div class="cover__seal">先生</div>
         </div>
         <div class="cover__hint">轻 触 翻 开</div>
@@ -388,6 +390,17 @@
     <span id="search-count"></span>
   </div>
 </div>
+
+<!-- ===================== 英语（板块式：词汇 / 作文） ===================== -->
+<section class="view" id="view-english">
+  <header class="en-topbar">
+    <button class="icon-btn" id="en-back" title="回到书房">←</button>
+    <span class="en-seal">英</span>
+    <span class="en-title" id="en-title">英 语</span>
+    <span class="en-pill" id="en-due-pill">待复习 0</span>
+  </header>
+  <div class="en-main" id="en-main"></div>
+</section>
 
 <!-- ===================== 访问口令锁屏 ===================== -->
 <div class="lock" id="lock" hidden>

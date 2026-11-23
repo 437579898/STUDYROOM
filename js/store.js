@@ -12,6 +12,21 @@ function blank() {
     wrongbook: { items: [] },
     memos: { items: [] },
     assistant: { messages: [] },      // 复习助手的对话（能看到全部记录，和每节的 chats 分开存）
+    // 英语板块（词汇默写 / 作文工作台）：与三科完全分开，旧 state 里没有也能跑
+    english: {
+      words: {},
+      chunks: {},
+      userWords: [],
+      session: { date: '', passed: 0, failed: 0, newLearned: 0 },
+      vault: [],
+      issues: [],
+      essays: [],
+      draft: { promptId: '', text: '', skeleton: ['', '', ''] },
+      prefs: {
+        newPerDay: 10, reviewCap: 30, cadenceDays: 2, dictation: 'A',
+        timeLimitApp: 20, timeLimitCont: 35, stageTimer: true,
+      },
+    },
     prefs: {
       lastSubject: null,
       lastVolume: null,
@@ -36,6 +51,19 @@ function normalize(raw) {
   if (raw.assistant && Array.isArray(raw.assistant.messages)) s.assistant.messages = raw.assistant.messages;
   if (raw.wrongbook && Array.isArray(raw.wrongbook.items)) s.wrongbook.items = raw.wrongbook.items;
   if (raw.memos && Array.isArray(raw.memos.items)) s.memos.items = raw.memos.items;
+  if (raw.english && typeof raw.english === 'object') {
+    const e = raw.english;
+    const base = s.english;
+    base.words = (e.words && typeof e.words === 'object') ? e.words : {};
+    base.chunks = (e.chunks && typeof e.chunks === 'object') ? e.chunks : {};
+    base.userWords = Array.isArray(e.userWords) ? e.userWords.filter((w) => w && w.id && w.w) : [];
+    base.session = (e.session && typeof e.session === 'object') ? Object.assign(base.session, e.session) : base.session;
+    base.vault = Array.isArray(e.vault) ? e.vault : [];
+    base.issues = Array.isArray(e.issues) ? e.issues : [];
+    base.essays = Array.isArray(e.essays) ? e.essays : [];
+    base.draft = (e.draft && typeof e.draft === 'object') ? Object.assign(base.draft, e.draft) : base.draft;
+    if (e.prefs && typeof e.prefs === 'object') Object.assign(base.prefs, e.prefs);
+  }
   if (raw.prefs && typeof raw.prefs === 'object') Object.assign(s.prefs, raw.prefs);
   // 搜索历史只接受字符串数组：state.json 被手工改过 / 旧版本没有这个字段时都能兜住
   s.prefs.searchHistory = Array.isArray(s.prefs.searchHistory)

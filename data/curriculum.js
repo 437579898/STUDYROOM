@@ -2027,6 +2027,62 @@ window.CURRICULUM = {
           ]
         }
       ]
+    },
+{
+      "id": "english",
+      "name": "英语",
+      "short": "英",
+      "color": "#6b5fa8",
+      "kind": "block",
+      "blocks": [
+        {
+          "id": "english-vocab",
+          "name": "词汇",
+          "desc": "默写 · 5 斜杠毕业",
+          "branches": [
+            {
+              "id": "english-vocab-hard",
+              "name": "高中难词"
+            },
+            {
+              "id": "english-vocab-cet4",
+              "name": "四级先行"
+            },
+            {
+              "id": "english-vocab-sense",
+              "name": "熟词僻义"
+            },
+            {
+              "id": "english-vocab-chunk",
+              "name": "固定搭配"
+            }
+          ]
+        },
+        {
+          "id": "english-writing",
+          "name": "作文",
+          "desc": "写 · 表达库 · 问题池 · 复盘",
+          "branches": [
+            {
+              "id": "english-write-app",
+              "name": "小作文 · 应用文"
+            },
+            {
+              "id": "english-write-cont",
+              "name": "读后续写"
+            },
+            {
+              "id": "english-write-vault",
+              "name": "我的表达库"
+            },
+            {
+              "id": "english-write-issues",
+              "name": "问题池"
+            }
+          ]
+        }
+      ],
+      "volumes": []
     }
   ]
 };

@@ -21,6 +21,7 @@ const view = {
 };
 
 let onPickSection = () => {};
+let onOpenEnglish = null;
 let dom = {};
 
 /* ---------------------------- 工具 ---------------------------- */
@@ -58,7 +59,9 @@ function renderLeft() {
       el('span', { class: 'subject-symbol', text: s.short || s.name[0] }),
       el('span', { class: 'subject-text' }, [
         el('span', { class: 'subject-name', text: s.name }),
-        el('span', { class: 'subject-meta', text: s.volumes.length + ' 册 · ' + st.total + ' 节 · 已学 ' + st.done + ' 节' }),
+        el('span', { class: 'subject-meta', text: s.kind === 'block'
+        ? ((s.blocks || []).length + ' 个板块')
+        : (s.volumes.length + ' 册 · ' + st.total + ' 节 · 已学 ' + st.done + ' 节') }),
       ]),
       el('span', { class: 'subject-arrow', text: '›' }),
     ]);
@@ -208,9 +211,11 @@ function renderRight() {
 
 /* ---------------------------- 交互 ---------------------------- */
 function pickSubject(id) {
-  if (view.subjectId === id) return;
   const s = getSubject(id);
   if (!s) return;
+  // 英语是「板块式」学科：不进书的目录流程，直接打开英语板块页
+  if (s.kind === 'block') { if (onOpenEnglish) onOpenEnglish(s.id); return; }
+  if (view.subjectId === id) return;
   view.subjectId = id;
   view.volumeId = (s.volumes[0] || {}).id || null;
   view.mode = 'chapters';
@@ -270,6 +275,7 @@ function closeBook() {
 /* ---------------------------- 对外 ---------------------------- */
 export function initBook(opts = {}) {
   onPickSection = opts.onPickSection || (() => {});
+  onOpenEnglish = opts.onOpenEnglish || null;
   dom = {
     view: $('#view-desk'),
     book: $('#book'),

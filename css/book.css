@@ -341,6 +341,7 @@
 .subject-item[data-subject="math"]    .subject-symbol { background: linear-gradient(150deg, #b07a3c, #7a4a1e); }
 .subject-item[data-subject="physics"] .subject-symbol { background: linear-gradient(150deg, #5b7fb5, #2f4a75); }
 .subject-item[data-subject="biology"] .subject-symbol { background: linear-gradient(150deg, #5b9370, #2e5b3d); }
+.subject-item[data-subject="english"] .subject-symbol { background: linear-gradient(150deg, #7d72bd, #4a3f80); }
 
 .subject-text { min-width: 0; }
 .subject-name { display: block; font-family: var(--font-serif); font-size: 19px; letter-spacing: .14em; color: var(--ink); }
