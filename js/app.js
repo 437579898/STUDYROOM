@@ -5,7 +5,7 @@ import { $, $$, el, toast, fmtTime, fmtDateTime } from './util.js';
 import { api, setAccessCode } from './api.js';
 import { store } from './store.js';
 import { CURRICULUM, getSectionWrap } from './subject.js';
-import { initOverlay, closeTop } from './overlay.js';
+import { initOverlay, closeTop, closeModal } from './overlay.js';
 import { initStage, applyStage } from './stage.js';
 import { detectMode, isStandalone, modeLabel } from './runtime.js';
 import { initBook, showDesk, refreshBook, openToSection } from './book.js';
@@ -16,6 +16,7 @@ import { initSettings, applyFxMode } from './settings.js';
 import { initSearch, closeSearch, toggleSearch } from './search.js';
 import { initAssistant, toggleAssistant, closeAssistant } from './assistant.js';
 import { initEnglish, openEnglish, closeEnglish } from './english.js';
+import { initSync, openSync, closeSync } from './sync.js';
 
 let currentView = 'desk';
 const CODE_KEY = 'study-room.access-code';
@@ -88,6 +89,7 @@ function showView(name) {
   currentView = name;
   document.body.classList.toggle('in-study', name === 'study');
   document.body.classList.toggle('in-english', name === 'english');
+  document.body.classList.toggle('in-sync', name === 'sync');
   if (typeof applyStage === 'function') applyStage();
 }
 
@@ -219,6 +221,22 @@ async function boot() {
     },
   });
 
+  initSync({
+    onExit: () => {
+      closeSync();
+      showView('desk');
+      try { refreshBook(); } catch { /* ignore */ }
+    },
+  });
+
+  // 设置面板 → 云端同步页
+  const syncBtn = $('#cfg-sync');
+  if (syncBtn) syncBtn.addEventListener('click', () => {
+    closeModal('modal-settings');
+    showView('sync');
+    openSync();
+  });
+
   initSearch({
     onPickSection: (id) => enterSection(id),
     onOpenDrawer: (which) => {
@@ -316,7 +334,13 @@ async function boot() {
 
   // 直接用链接打开复习助手：?asst=1（方便给自己收藏一个「回顾」入口）
   try {
-    if (new URLSearchParams(location.search).get('asst') === '1') {
+    // 直接用链接打开同步页：?sync=1
+  if (new URLSearchParams(location.search).get('sync') === '1') {
+    showView('sync');
+    openSync();
+  }
+
+  if (new URLSearchParams(location.search).get('asst') === '1') {
       setTimeout(() => { try { toggleAssistant(true); } catch { /* ignore */ } }, 350);
     }
   } catch { /* ignore */ }

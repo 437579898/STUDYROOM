@@ -1,0 +1,21 @@
+/* 云端同步页（复用 english.css 的卡片/按钮，只补差异） */
+#view-sync .en-main { padding-bottom: 64px; }
+.sync-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+.sync-label { font-family: var(--font-sans); font-size: 12px; color: #8a7350; min-width: 52px; }
+.sync-input { flex: 0 1 240px; }
+.sync-dev {
+  display: grid; grid-template-columns: 1fr 190px 150px auto;
+  align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 8px;
+  border: 1px solid rgba(140, 115, 75, .18);
+  background: rgba(255, 255, 255, .35);
+  margin: 4px 0;
+}
+.sync-dev.is-on { border-color: rgba(107, 95, 168, .55); background: rgba(107, 95, 168, .08); }
+.sync-dev__name { font-family: var(--font-serif); font-size: 13.5px; color: #3a2c1c; }
+.sync-dev__meta { font-size: 11.5px; color: #8a7350; }
+.sync-dev__stats { font-size: 11.5px; color: #574733; }
+.sync-modes { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.sync-foot { margin-top: 8px; }
+
+body.in-sync .corner--tl, body.in-sync .corner--tr { display: none; }

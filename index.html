@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="css/book.css">
 <link rel="stylesheet" href="css/study.css">
 <link rel="stylesheet" href="css/english.css">
+<link rel="stylesheet" href="css/sync.css">
 <link rel="stylesheet" href="css/content.css">
 <link rel="stylesheet" href="css/panels.css">
 <link rel="stylesheet" href="css/layout.css">
@@ -22,7 +23,7 @@
 <script defer src="vendor/katex/katex.min.js"></script>
 <script defer src="vendor/katex/contrib/mhchem.min.js"></script>
 <script defer src="vendor/marked.min.js"></script>
-<script defer src="js/app.js?v=1.10.0" type="module"></script>
+<script defer src="js/app.js?v=1.11.0" type="module"></script>
 </head>
 <body>
 
@@ -242,6 +243,15 @@
     <div class="mode-line" id="cfg-mode"></div>
 
     <div class="setting-group">
+      <h4>进 度 同 步</h4>
+      <div class="field">
+        <label>云端同步</label>
+        <button class="btn" id="cfg-sync">打开同步页面</button>
+        <span class="hint">把本机进度上传到这台电脑，或从别的设备那里拉一份覆盖回来；可以只同步某个学科。</span>
+      </div>
+    </div>
+
+    <div class="setting-group">
       <h4>接 入 方 式</h4>
       <div class="field">
         <label>API 地址（OpenAI 兼容）</label>
@@ -400,6 +410,17 @@
     <span class="en-pill" id="en-due-pill">待复习 0</span>
   </header>
   <div class="en-main" id="en-main"></div>
+</section>
+
+<!-- ===================== 云端同步（进度快照） ===================== -->
+<section class="view" id="view-sync">
+  <header class="en-topbar">
+    <button class="icon-btn" id="sync-back" title="回到书房">←</button>
+    <span class="en-seal">云</span>
+    <span class="en-title" id="sync-title">云 端 同 步</span>
+    <span class="en-pill" id="sync-pill">只同步进度</span>
+  </header>
+  <div class="en-main" id="sync-main"></div>
 </section>
 
 <!-- ===================== 访问口令锁屏 ===================== -->
