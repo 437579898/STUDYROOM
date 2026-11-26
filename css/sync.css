@@ -19,3 +19,21 @@
 .sync-foot { margin-top: 8px; }
 
 body.in-sync .corner--tl, body.in-sync .corner--tr { display: none; }
+
+.sync-error {
+  margin: 4px 0 10px; padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(138, 79, 89, .45);
+  background: rgba(138, 79, 89, .10);
+  color: #6b2f38;
+  font-family: var(--font-sans); font-size: 12.5px; line-height: 1.6;
+}
+.sync-error b { color: #8a4f59; }
+.sync-error__hint { margin-top: 4px; color: #7a5a5f; font-size: 12px; }
+.sync-error .en-btn { margin-top: 6px; }
+
+.sync-provider { display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; }
+.sync-provider__label { font-family: var(--font-sans); font-size: 12px; color: #8a7350; }
+.sync-field { display: flex; align-items: center; gap: 10px; margin: 5px 0; }
+.sync-field .sync-label { min-width: 52px; }
+.sync-field .sync-input { flex: 1 1 auto; max-width: 420px; }

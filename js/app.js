@@ -5,7 +5,7 @@ import { $, $$, el, toast, fmtTime, fmtDateTime } from './util.js';
 import { api, setAccessCode } from './api.js';
 import { store } from './store.js';
 import { CURRICULUM, getSectionWrap } from './subject.js';
-import { initOverlay, closeTop, closeModal } from './overlay.js';
+import { initOverlay, closeTop, closeModal, isModalOpen } from './overlay.js';
 import { initStage, applyStage } from './stage.js';
 import { detectMode, isStandalone, modeLabel } from './runtime.js';
 import { initBook, showDesk, refreshBook, openToSection } from './book.js';
@@ -205,7 +205,18 @@ async function boot() {
   applyFxMode();   // 公式强调开关（默认开；关掉时给 body 加 no-fx）
 
   // 再读服务端数据，据此初始化界面（否则会用到默认值）
-  await store.init();
+  // 兜底：IndexedDB / fetch 卡住时不能让整个界面停在封面上 —— 4 秒后先继续跑（内存态），别丢用户输入
+  {
+    const r = await Promise.race([
+      store.init().then(() => 'ok').catch((e) => { console.warn('[store.init]', e); return 'err'; }),
+      new Promise((res) => setTimeout(() => res('timeout'), 4000)),
+    ]);
+    if (r !== 'ok') {
+      setTimeout(() => toast(r === 'timeout'
+        ? '读取本地数据超时：这一轮先在内存里用，刷新后可能回到上一次保存的状态'
+        : '读取本地数据失败：' + ((store.lastError && store.lastError.message) || '未知原因'), 'err'), 900);
+    }
+  }
   applyStage();
 
   initBook({
@@ -288,11 +299,16 @@ async function boot() {
   // 全局快捷键
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      const hadModal = isModalOpen();
       closeTop();
       closeSearch();
       closeWrongbook();
       closeMemo();
       closeAssistant();
+      if (!hadModal && currentView === 'sync') {
+        closeSync();
+        showView('desk');
+      }
     }
     // Ctrl/Cmd + F 打开搜索
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
